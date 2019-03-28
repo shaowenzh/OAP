@@ -64,6 +64,7 @@ trait SharedOapContextBase extends OapSharedSQLContext {
   // avoid the overflow of offHeap memory
   oapSparkConf.set("spark.memory.offHeap.size", "100m")
   oapSparkConf.set("spark.sql.extensions", classOf[OapExtensions].getCanonicalName)
+  oapSparkConf.set(OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key, "1.0")
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
