@@ -231,18 +231,22 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
   override def cacheSize: Long = _cacheSize.get()
 
   override def cacheStats: CacheStats = {
-    // TODO now CacheStats only contains dataCache stats of histCount, missCount and so on, need
-    // refactor CacheStats to add indexCache stats and modify OAPTab ui.
-    val stats = dataCacheInstance.stats()
+    val dataStats = dataCacheInstance.stats()
+    val indexStats = indexCacheInstance.stats()
     CacheStats(
       dataFiberCount.get(), dataFiberSize.get(),
       indexFiberCount.get(), indexFiberSize.get(),
       pendingFiberCount, cacheGuardian.pendingFiberSize,
-      stats.hitCount(),
-      stats.missCount(),
-      stats.loadCount(),
-      stats.totalLoadTime(),
-      stats.evictionCount()
+      dataStats.hitCount(),
+      dataStats.missCount(),
+      dataStats.loadCount(),
+      dataStats.totalLoadTime(),
+      dataStats.evictionCount(),
+      indexStats.hitCount(),
+      indexStats.missCount(),
+      indexStats.loadCount(),
+      indexStats.totalLoadTime(),
+      indexStats.evictionCount(),
     )
   }
 

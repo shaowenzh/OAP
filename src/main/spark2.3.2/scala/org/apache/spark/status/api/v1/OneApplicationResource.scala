@@ -80,11 +80,16 @@ private[v1] class AbstractApplicationResource extends BaseAppResource {
             cacheStats.indexFiberCount,
             cacheStats.pendingFiberSize,
             cacheStats.pendingFiberCount,
-            cacheStats.hitCount,
-            cacheStats.missCount,
-            cacheStats.loadCount,
-            cacheStats.totalLoadTime,
-            cacheStats.evictionCount
+            cacheStats.dataFiberHitCount,
+            cacheStats.dataFiberMissCount,
+            cacheStats.dataFiberLoadCount,
+            cacheStats.dataTotalLoadTime,
+            cacheStats.dataEvictionCount,
+            cacheStats.indexFiberHitCount,
+            cacheStats.indexFiberMissCount,
+            cacheStats.indexFiberLoadCount,
+            cacheStats.indexTotalLoadTime,
+            cacheStats.indexEvictionCount
           )
         }
     )

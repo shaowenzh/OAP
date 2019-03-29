@@ -141,11 +141,16 @@ $(document).ready(function () {
             var allIndexFiberCount = 0;
             var allPendingFiberSize = 0;
             var allPendingFiberCount = 0;
-            var allHitCount = 0;
-            var allMissCount = 0;
-            var allLoadCount = 0;
-            var allLoadTime = 0;
-            var allEvictionCount = 0;
+            var allDataFiberHitCount = 0;
+            var allDataFiberMissCount = 0;
+            var allDataFiberLoadCount = 0;
+            var allDataLoadTime = 0;
+            var allDataEvictionCount = 0;
+            var allIndexFiberHitCount = 0;
+            var allIndexFiberMissCount = 0;
+            var allIndexFiberLoadCount = 0;
+            var allIndexLoadTime = 0;
+            var allIndexEvictionCount = 0;
 
             response.forEach(function (exec) {
                 allExecCnt += 1;
@@ -161,11 +166,16 @@ $(document).ready(function () {
                 allIndexFiberCount   += exec.indexFiberCount;
                 allPendingFiberSize  += exec.pendingFiberSize;
                 allPendingFiberCount += exec.pendingFiberCount;
-                allHitCount          += exec.hitCount;
-                allMissCount         += exec.missCount;
-                allLoadCount         += exec.loadCount;
-                allLoadTime          += exec.loadTime;
-                allEvictionCount     += exec.evictionCount;
+                allDataFiberHitCount          += exec.dataFiberHitCount;
+                allDataFiberMissCount         += exec.dataFiberMissCount;
+                allDataFiberLoadCount         += exec.dataFiberLoadCount;
+                allDataLoadTime          += exec.dataTotalLoadTime;
+                allDataEvictionCount     += exec.dataEvictionCount;
+                allIndexFiberHitCount          += exec.indexFiberHitCount;
+                allIndexFiberMissCount         += exec.indexFiberMissCount;
+                allIndexFiberLoadCount         += exec.indexFiberLoadCount;
+                allIndexLoadTime          += exec.indexTotalLoadTime;
+                allIndexEvictionCount     += exec.indexEvictionCount;
             });
 
             var totalSummary = {
@@ -182,11 +192,16 @@ $(document).ready(function () {
                 "allIndexFiberCount": allIndexFiberCount,
                 "allPendingFiberSize": allPendingFiberSize,
                 "allPendingFiberCount": allPendingFiberCount,
-                "allHitCount": allHitCount,
-                "allMissCount": allMissCount,
-                "allLoadCount": allLoadCount,
-                "allLoadTime": allLoadTime,
-                "allEvictionCount": allEvictionCount
+                "allDataFiberHitCount": allDataFiberHitCount,
+                "allDataFiberMissCount": allDataFiberMissCount,
+                "allDataFiberLoadCount": allDataFiberLoadCount,
+                "allDataLoadTime": allDataLoadTime,
+                "allDataEvictionCount": allDataEvictionCount,
+                "allIndexFiberHitCount": allIndexFiberHitCount,
+                "allIndexFiberMissCount": allIndexFiberMissCount,
+                "allIndexFiberLoadCount": allIndexFiberLoadCount,
+                "allIndexLoadTime": allIndexLoadTime,
+                "allIndexEvictionCount": allIndexEvictionCount
             };
 
             var data = {fibercachemanagers: response, "fiberCacheManagerSummary": [totalSummary]};
@@ -230,8 +245,48 @@ $(document).ready(function () {
                         },
                         {
                             data: function (row, type) {
+                                return type === 'display' ? (row.dataFiberHitCount * 100
+                                    / (row.dataFiberHitCount + row.dataFiberMissCount)).toFixed(2)
+                                    + '% (' + formatCount(row.dataFiberHitCount, type) + '/'
+                                    + formatCount(row.dataFiberMissCount, type) + ')' : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ? (formatCount(row.dataFiberLoadCount, type)  + ' / '
+                                    + formatCount(row.dataEvictionCount, type)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ?
+                                    formatDuration((row.dataTotalLoadTime / 1000000 / row.dataFiberLoadCount).toFixed(2)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
                                 return type === 'display' ? (formatBytes(row.indexFiberSize, type)  + ' / '
                                     + formatCount(row.indexFiberCount, type)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ? (row.indexFiberHitCount * 100
+                                    / (row.indexFiberHitCount + row.indexFiberMissCount)).toFixed(2)
+                                    + '% (' + formatCount(row.indexFiberHitCount, type) + '/'
+                                    + formatCount(row.indexFiberMissCount, type) + ')' : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ? (formatCount(row.indexFiberLoadCount, type)  + ' / '
+                                    + formatCount(row.indexEvictionCount, type)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ?
+                                    formatDuration((row.indexTotalLoadTime / 1000000 / row.indexFiberLoadCount).toFixed(2)) : 'Nan'
                             }
                         },
                         {
@@ -240,22 +295,6 @@ $(document).ready(function () {
                                     + formatCount(row.pendingFiberCount, type)) : 'Nan'
                             }
                         },
-                        {
-                            data: function (row, type) {
-                                return type === 'display' ? (row.hitCount * 100
-                                    / (row.hitCount + row.missCount)).toFixed(2)
-                                    + '% (' + formatCount(row.hitCount, type) + '/'
-                                    + formatCount(row.missCount, type) + ')' : 'Nan'
-                            }
-                        },
-                        {data: 'loadCount', render: formatCount},
-                        {
-                            data: function (row, type) {
-                                return type === 'display' ?
-                                    formatDuration((row.loadTime / 1000000 / row.loadCount).toFixed(2)) : 'Nan'
-                            }
-                        },
-                        {data: 'evictionCount', render: formatCount}
                     ],
                     "order": [[0, "asc"]]
                 };
@@ -299,8 +338,48 @@ $(document).ready(function () {
                         },
                         {
                             data: function (row, type) {
+                                return type === 'display' ? (row.allDataFiberHitCount * 100
+                                    / (row.allDataFiberHitCount + row.allDataFiberMissCount)).toFixed(2)
+                                    + '% (' + formatCount(row.allDataFiberHitCount, type) + '/'
+                                    + formatCount(row.allDataFiberMissCount, type) + ')' : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ? (formatCount(row.allDataFiberLoadCount, type)  + ' / '
+                                    + formatCount(row.allDataEvictionCount, type)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ?
+                                    formatDuration((row.allDataLoadTime / 1000000 / row.allDataFiberLoadCount).toFixed(2)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
                                 return type === 'display' ? (formatBytes(row.allIndexFiberSize, type)
                                     + ' / ' + formatCount(row.allIndexFiberCount, type)) : "Nan"
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ? (row.allIndexFiberHitCount * 100
+                                    / (row.allIndexFiberHitCount + row.allIndexFiberMissCount)).toFixed(2)
+                                    + '% (' + formatCount(row.allIndexFiberHitCount, type) + '/'
+                                    + formatCount(row.allIndexFiberMissCount, type) + ')' : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ? (formatCount(row.allIndexFiberLoadCount, type)  + ' / '
+                                    + formatCount(row.allIndexEvictionCount, type)) : 'Nan'
+                            }
+                        },
+                        {
+                            data: function (row, type) {
+                                return type === 'display' ?
+                                    formatDuration((row.allIndexLoadTime / 1000000 / row.allIndexFiberLoadCount).toFixed(2)) : 'Nan'
                             }
                         },
                         {
@@ -309,22 +388,6 @@ $(document).ready(function () {
                                     + ' / ' + formatCount(row.allPendingFiberCount, type)) : "Nan"
                             }
                         },
-                        {
-                            data: function (row, type) {
-                                return type === 'display' ? (row.allHitCount * 100
-                                    / (row.allHitCount + row.allMissCount)).toFixed(2)
-                                    + '% (' + formatCount(row.allHitCount, type) + '/'
-                                    + formatCount(row.allMissCount, type) + ')' : 'Nan'
-                            }
-                        },
-                        {data: 'allLoadCount', render: formatCount},
-                        {
-                            data: function (row, type) {
-                                return type === 'display' ?
-                                    formatDuration((row.allLoadTime / 1000000 / row.allLoadCount).toFixed(2)) : 'Nan'
-                            }
-                        },
-                        {data: "allEvictionCount", render: formatCount}
                     ],
                     "paging": false,
                     "searching": false,
