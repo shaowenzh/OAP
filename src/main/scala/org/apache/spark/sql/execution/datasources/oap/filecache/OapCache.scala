@@ -246,7 +246,7 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
       indexStats.missCount(),
       indexStats.loadCount(),
       indexStats.totalLoadTime(),
-      indexStats.evictionCount(),
+      indexStats.evictionCount()
     )
   }
 

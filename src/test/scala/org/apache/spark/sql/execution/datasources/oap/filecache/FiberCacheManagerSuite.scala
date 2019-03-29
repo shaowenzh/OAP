@@ -59,9 +59,9 @@ class FiberCacheManagerSuite extends SharedOapContext {
       fiberCache2.release()
     }
     val stats = fiberCacheManager.cacheStats.minus(origStats)
-    assert(stats.missCount == memorySizeInMB * 2)
-    assert(stats.hitCount == memorySizeInMB * 2)
-    assert(stats.evictionCount >= memorySizeInMB)
+    assert(stats.dataFiberMissCount == memorySizeInMB * 2)
+    assert(stats.dataFiberHitCount == memorySizeInMB * 2)
+    assert(stats.dataEvictionCount >= memorySizeInMB)
   }
 
   test("remove a fiber is in use") {
@@ -127,11 +127,11 @@ class FiberCacheManagerSuite extends SharedOapContext {
     val fiber = TestFiberId(
       () => memoryManager.toDataFiberCache(data), s"test fiber #$fiberGroupId.0")
     val fiberCache1 = fiberCacheManager.get(fiber)
-    assert(fiberCacheManager.cacheStats.minus(origStats).missCount == 1)
+    assert(fiberCacheManager.cacheStats.minus(origStats).dataFiberMissCount == 1)
     val sameFiber = TestFiberId(
       () => memoryManager.toDataFiberCache(data), s"test fiber #$fiberGroupId.0")
     val fiberCache2 = fiberCacheManager.get(sameFiber)
-    assert(fiberCacheManager.cacheStats.minus(origStats).hitCount == 1)
+    assert(fiberCacheManager.cacheStats.minus(origStats).dataFiberHitCount == 1)
     fiberCache1.release()
     fiberCache2.release()
   }

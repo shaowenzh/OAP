@@ -147,7 +147,7 @@ class FiberSensorSuite extends QueryTest with SharedOapContext with BeforeAndAft
     CacheStats.reset
     val conf: SparkConf = new SparkConf()
     conf.set(OapConf.OAP_UPDATE_FIBER_CACHE_METRICS_INTERVAL_SEC.key, 0L.toString)
-    val cacheStats = CacheStats(2, 19, 10, 2, 0, 0, 213, 23, 23, 123131, 2)
+    val cacheStats = CacheStats(2, 19, 10, 2, 0, 0, 213, 23, 23, 123131, 2, 3, 23, 11, 22, 33)
     listener.onOtherEvent(SparkListenerCustomInfoUpdate(
       host, execID, messager, CacheStats.status(cacheStats, conf)))
     assertResult(1)(fiberSensor.executorToCacheManager.size())
