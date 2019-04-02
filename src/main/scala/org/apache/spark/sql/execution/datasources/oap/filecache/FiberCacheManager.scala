@@ -138,9 +138,11 @@ private[sql] class FiberCacheManager(
   }
 
   // Used by test suite
-  private[filecache] def releaseFiber(fiber: TestFiberId): Unit = {
-    if (cacheBackend.getIfPresent(fiber) != null) {
-      cacheBackend.invalidate(fiber)
+  private[filecache] def releaseFiber(fiber: FiberId): Unit = {
+    if (fiber.isInstanceOf[TestDataFiberId] || fiber.isInstanceOf[TestIndexFiberId]) {
+      if (cacheBackend.getIfPresent(fiber) != null) {
+        cacheBackend.invalidate(fiber)
+      }
     }
   }
 

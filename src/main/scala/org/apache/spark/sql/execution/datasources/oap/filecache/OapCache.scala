@@ -52,10 +52,13 @@ trait OapCache {
   }
 
   def incFiberCountAndSize(fiber: FiberId, count: Long, size: Long): Unit = {
-    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestFiberId]) {
+    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
       dataFiberCount.addAndGet(count)
       dataFiberSize.addAndGet(size)
-    } else if (fiber.isInstanceOf[BTreeFiberId] || fiber.isInstanceOf[BitmapFiberId]) {
+    } else if (
+      fiber.isInstanceOf[BTreeFiberId] ||
+      fiber.isInstanceOf[BitmapFiberId] ||
+      fiber.isInstanceOf[TestIndexFiberId]) {
       indexFiberCount.addAndGet(count)
       indexFiberSize.addAndGet(size)
     }
@@ -69,7 +72,8 @@ trait OapCache {
       case DataFiberId(file, columnIndex, rowGroupId) => file.cache(rowGroupId, columnIndex)
       case BTreeFiberId(getFiberData, _, _, _) => getFiberData.apply()
       case BitmapFiberId(getFiberData, _, _, _) => getFiberData.apply()
-      case TestFiberId(getFiberData, _) => getFiberData.apply()
+      case TestDataFiberId(getFiberData, _) => getFiberData.apply()
+      case TestIndexFiberId(getFiberData, _) => getFiberData.apply()
       case _ => throw new OapException("Unexpected FiberId type!")
     }
     cache.fiberId = fiber
@@ -189,9 +193,12 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
     readLock.lock()
     try {
       val fiberCache: FiberCache =
-        if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestFiberId]) {
+        if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
           dataCacheInstance.get(fiber)
-        } else if (fiber.isInstanceOf[BTreeFiberId] || fiber.isInstanceOf[BitmapFiberId]) {
+        } else if (
+          fiber.isInstanceOf[BTreeFiberId] ||
+          fiber.isInstanceOf[BitmapFiberId] ||
+          fiber.isInstanceOf[TestIndexFiberId]) {
           indexCacheInstance.get(fiber)
         } else throw new OapException(s"not support fiber type $fiber")
       // Avoid loading a fiber larger than MAX_WEIGHT / CONCURRENCY_LEVEL
@@ -207,9 +214,12 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
   }
 
   override def getIfPresent(fiber: FiberId): FiberCache =
-    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestFiberId]) {
+    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
       dataCacheInstance.getIfPresent(fiber)
-    } else if (fiber.isInstanceOf[BTreeFiberId] || fiber.isInstanceOf[BitmapFiberId]) {
+    } else if (
+      fiber.isInstanceOf[BTreeFiberId] ||
+      fiber.isInstanceOf[BitmapFiberId] ||
+      fiber.isInstanceOf[TestIndexFiberId]) {
       indexCacheInstance.getIfPresent(fiber)
     } else null
 
@@ -218,9 +228,12 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
       indexCacheInstance.asMap().keySet().asScala.toSet
 
   override def invalidate(fiber: FiberId): Unit =
-    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestFiberId]) {
+    if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
       dataCacheInstance.invalidate(fiber)
-    } else if (fiber.isInstanceOf[BTreeFiberId] || fiber.isInstanceOf[BitmapFiberId]) {
+    } else if (
+      fiber.isInstanceOf[BTreeFiberId] ||
+      fiber.isInstanceOf[BitmapFiberId] ||
+      fiber.isInstanceOf[TestIndexFiberId]) {
       indexCacheInstance.invalidate(fiber)
     }
 
