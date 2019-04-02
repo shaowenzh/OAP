@@ -192,22 +192,28 @@ class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
     val readLock = OapRuntime.getOrCreate.fiberLockManager.getFiberLock(fiber).readLock()
     readLock.lock()
     try {
-      val fiberCache: FiberCache =
         if (fiber.isInstanceOf[DataFiberId] || fiber.isInstanceOf[TestDataFiberId]) {
-          dataCacheInstance.get(fiber)
+          val fiberCache = dataCacheInstance.get(fiber)
+          // Avoid loading a fiber larger than DATA_MAX_WEIGHT / CONCURRENCY_LEVEL
+          assert(fiberCache.size() <= DATA_MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
+            s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
+              s"with cache's MAX_WEIGHT" +
+              s"(${Utils.bytesToString(DATA_MAX_WEIGHT.toLong * KB.toLong)}) / $CONCURRENCY_LEVEL")
+          fiberCache.occupy()
+          fiberCache
         } else if (
           fiber.isInstanceOf[BTreeFiberId] ||
           fiber.isInstanceOf[BitmapFiberId] ||
           fiber.isInstanceOf[TestIndexFiberId]) {
-          indexCacheInstance.get(fiber)
+          val fiberCache = indexCacheInstance.get(fiber)
+          // Avoid loading a fiber larger than INDEX_MAX_WEIGHT / CONCURRENCY_LEVEL
+          assert(fiberCache.size() <= INDEX_MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
+            s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
+              s"with cache's MAX_WEIGHT" +
+              s"(${Utils.bytesToString(INDEX_MAX_WEIGHT.toLong * KB.toLong)}) / $CONCURRENCY_LEVEL")
+          fiberCache.occupy()
+          fiberCache
         } else throw new OapException(s"not support fiber type $fiber")
-      // Avoid loading a fiber larger than MAX_WEIGHT / CONCURRENCY_LEVEL
-      assert(fiberCache.size() <= MAX_WEIGHT * KB / CONCURRENCY_LEVEL,
-        s"Failed to cache fiber(${Utils.bytesToString(fiberCache.size())}) " +
-          s"with cache's MAX_WEIGHT" +
-          s"(${Utils.bytesToString(MAX_WEIGHT.toLong * KB.toLong)}) / $CONCURRENCY_LEVEL")
-      fiberCache.occupy()
-      fiberCache
     } finally {
       readLock.unlock()
     }
