@@ -140,6 +140,25 @@ object OapConf {
       .stringConf
       .createWithDefault("offheap")
 
+  val OAP_MIXED_INDEX_MEMORY_MANAGER =
+    SqlConfAdapter.buildConf("spark.sql.oap.mixed.index.memory.manager")
+      .internal()
+      .doc("Sets the implement of index memory manager in mixed mode," +
+        "it only supports offheap(DRAM OFF_HEAP) and " +
+        "(PM) Intel Optane DC persistent memory currently.")
+      .stringConf
+      .createWithDefault("offheap")
+
+  val OAP_MIXED_DATA_MEMORY_MANAGER =
+    SqlConfAdapter.buildConf("spark.sql.oap.mixed.data.memory.manager")
+      .internal()
+      .doc("Sets the implement of data memory manager in mix mode," +
+        "it only supports offheap(DRAM OFF_HEAP) and " +
+        "(PM) Intel Optane DC persistent memory currently." +
+        "This is only available in mix mode")
+      .stringConf
+      .createWithDefault("offheap")
+
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.config.file")
       .internal()

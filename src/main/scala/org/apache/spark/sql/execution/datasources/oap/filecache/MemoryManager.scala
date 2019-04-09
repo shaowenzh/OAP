@@ -262,3 +262,108 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }
 }
+
+/**
+ * An memory manager contains different memory manager for index and data.
+ */
+private[filecache] class MixedMemoryManager(sparkEnv: SparkEnv)
+  extends MemoryManager with Logging {
+
+  // TODO: a config to control max memory size
+  private val (indexMemoryManager, dataMemoryManager) = init()
+
+  // TODO: Atomic is really needed?
+  private val _memoryUsed = new AtomicLong(0)
+
+  override def memoryUsed: Long = _memoryUsed.get()
+
+  private def init(): (MemoryManager, MemoryManager) = {
+    val indexManager =
+      sparkEnv.conf.get(
+        OapConf.OAP_MIXED_INDEX_MEMORY_MANAGER.key,
+        OapConf.OAP_MIXED_INDEX_MEMORY_MANAGER.defaultValue.get)
+        .toLowerCase match {
+        case "offheap" => new OffHeapMemoryManager(sparkEnv)
+        case "pm" => new PersistentMemoryManager(sparkEnv)
+        case _ => throw new UnsupportedOperationException(
+          s"The memory manager: ${_} is not supported now")
+      }
+
+    val dataManager =
+      sparkEnv.conf.get(
+        OapConf.OAP_MIXED_DATA_MEMORY_MANAGER.key,
+        OapConf.OAP_MIXED_DATA_MEMORY_MANAGER.defaultValue.get)
+        .toLowerCase match {
+        case "offheap" => new OffHeapMemoryManager(sparkEnv)
+        case "pm" => new PersistentMemoryManager(sparkEnv)
+        case _ => throw new UnsupportedOperationException(
+          s"The memory manager: ${_} is not supported now")
+      }
+    (indexManager, dataManager)
+  }
+
+  override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
+    throw new IllegalAccessException("Can't do direct allocate for MixedMemoryManager")
+  }
+
+  /**
+   * Used by IndexFile
+   */
+  override def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+    toIndexFiberCache(bytes)
+  }
+
+  /**
+   * Used by IndexFile. For decompressed data
+   */
+  override def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
+    val block = indexMemoryManager.allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      block.baseObject,
+      block.baseOffset,
+      bytes.length)
+    FiberCache(block)
+  }
+
+  /**
+   * Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
+   * off-heap memory
+   */
+  override def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
+    val block = dataMemoryManager.allocate(bytes.length)
+    Platform.copyMemory(
+      bytes,
+      Platform.BYTE_ARRAY_OFFSET,
+      block.baseObject,
+      block.baseOffset,
+      bytes.length)
+    FiberCache(block)
+  }
+
+  override def getEmptyDataFiberCache(length: Long): FiberCache = {
+    FiberCache(dataMemoryManager.allocate(length))
+  }
+
+  override private[filecache] def free(block: MemoryBlockHolder): Unit = {
+    // TODO:
+  }
+
+  override def stop(): Unit = {
+    indexMemoryManager.stop()
+    dataMemoryManager.stop()
+  }
+
+  /**
+   * The memory size used for cache.
+   */
+  override def cacheMemory: Long = _
+
+  /**
+   * The memory size used for cache guardian.
+   */
+  override def cacheGuardianMemory: Long = _
+}
