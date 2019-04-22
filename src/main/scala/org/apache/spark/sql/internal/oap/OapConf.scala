@@ -128,7 +128,8 @@ object OapConf {
   val OAP_DATAFIBER_USE_FIBERCACHE_RATIO =
     SqlConfAdapter.buildConf("spark.sql.oap.dataCache.use.fiberCache.ratio")
       .internal()
-      .doc("Define the ratio of data cache use fiber cache ratio.")
+      .doc("Define the ratio of data cache use fiber cache ratio. " +
+        "This is not available under mix mode")
       .doubleConf
       .createWithDefault(0.8)
 
@@ -145,7 +146,8 @@ object OapConf {
       .internal()
       .doc("Sets the implement of index memory manager in mix mode," +
         "it only supports offheap(DRAM OFF_HEAP) and " +
-        "(PM) Intel Optane DC persistent memory currently.")
+        "(PM) Intel Optane DC persistent memory currently." +
+        "It should be different from spark.sql.oap.mix.data.memory.manager")
       .stringConf
       .createWithDefault("offheap")
 
@@ -155,7 +157,7 @@ object OapConf {
       .doc("Sets the implement of data memory manager in mix mode," +
         "it only supports offheap(DRAM OFF_HEAP) and " +
         "(PM) Intel Optane DC persistent memory currently." +
-        "This is only available in mix mode")
+        "It should be different from spark.sql.oap.mix.index.memory.manager")
       .stringConf
       .createWithDefault("pm")
 
