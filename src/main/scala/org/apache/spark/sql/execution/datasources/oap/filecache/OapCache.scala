@@ -117,17 +117,19 @@ class SimpleOapCache extends OapCache with Logging {
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
 }
 
-class GuavaOapCache(cacheMemory: Long, cacheGuardianMemory: Long,
-    dataCacheUseRatio: Double) extends OapCache with Logging {
+class GuavaOapCache(
+    dataCacheMemory: Long,
+    indexCacheMemory: Long,
+    cacheGuardianMemory: Long)
+    extends OapCache with Logging {
 
   // TODO: CacheGuardian can also track cache statistics periodically
   private val cacheGuardian = new CacheGuardian(cacheGuardianMemory)
   cacheGuardian.start()
 
   private val KB: Double = 1024
-  private val MAX_WEIGHT = (cacheMemory / KB).toInt
-  private val DATA_MAX_WEIGHT = (cacheMemory * dataCacheUseRatio / KB).toInt
-  private val INDEX_MAX_WEIGHT = MAX_WEIGHT - DATA_MAX_WEIGHT
+  private val DATA_MAX_WEIGHT = (dataCacheMemory / KB).toInt
+  private val INDEX_MAX_WEIGHT = (indexCacheMemory / KB).toInt
   private val CONCURRENCY_LEVEL = 4
 
   // Total cached size for debug purpose, not include pending fiber

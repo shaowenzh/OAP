@@ -54,9 +54,19 @@ private[sql] abstract class MemoryManager {
   def memoryUsed: Long
 
   /**
-   * The memory size used for cache.
+   * The memory size used for index cache.
    */
-  def cacheMemory: Long
+  def totalCacheMemory: Long = indexCacheMemory + dataCacheMemory
+
+  /**
+   * The memory size used for index cache.
+   */
+  def indexCacheMemory: Long
+
+  /**
+   * The memory size used for data cache.
+   */
+  def dataCacheMemory: Long
 
   /**
    * The memory size used for cache guardian.
@@ -158,11 +168,18 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
   }
 
   // TODO: a config to control max memory size
-  private val (_cacheMemory, _cacheGuardianMemory) = {
+  private val (_dataCacheMemory, _indexCacheMemory, _cacheGuardianMemory) = {
     if (memoryManager.acquireStorageMemory(
       MemoryManager.DUMMY_BLOCK_ID, oapMemory, MemoryMode.OFF_HEAP)) {
+      val dataCacheRatio = sparkEnv.conf.getDouble(
+        OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key,
+        OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.defaultValue.get)
+      require(dataCacheRatio >= 0 && dataCacheRatio <= 1,
+        "dataCacheRatio should be between 0 and 1")
       // TODO: make 0.9, 0.1 configurable
-      ((oapMemory * 0.9).toLong, (oapMemory * 0.1).toLong)
+      ((oapMemory * 0.9 * dataCacheRatio).toLong,
+        (oapMemory * 0.9 * (1 - dataCacheRatio)).toLong,
+        (oapMemory * 0.1).toLong)
     } else {
       throw new OapException("Can't acquire memory from spark Memory Manager")
     }
@@ -173,7 +190,9 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 
   override def memoryUsed: Long = _memoryUsed.get()
 
-  override def cacheMemory: Long = _cacheMemory
+  override def dataCacheMemory: Long = _dataCacheMemory
+
+  override def indexCacheMemory: Long = _indexCacheMemory
 
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
@@ -205,11 +224,11 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
 private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
 
-  private val (_cacheMemory, _cacheGuardianMemory) = init()
+  private val (_dataCacheMemory, _indexCacheMemory, _cacheGuardianMemory) = init()
 
   private val _memoryUsed = new AtomicLong(0)
 
-  private def init(): (Long, Long) = {
+  private def init(): (Long, Long, Long) = {
     val conf = sparkEnv.conf
     // The NUMA id should be set when the executor process start up. However, Spark don't
     // support NUMA binding currently.
@@ -237,12 +256,23 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     require(reservedSize >= 0 && reservedSize < initialSize, s"Reserved size(${reservedSize}) " +
       s"should be larger than zero and smaller than initial size(${initialSize})")
     val totalUsableSize = initialSize - reservedSize
-    ((totalUsableSize * 0.9).toLong, (totalUsableSize * 0.1).toLong)
+
+    val dataCacheRatio = sparkEnv.conf.getDouble(
+      OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key,
+      OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.defaultValue.get)
+    require(dataCacheRatio >= 0 && dataCacheRatio <= 1,
+      "dataCacheRatio should be between 0 and 1")
+
+    ((totalUsableSize * 0.9 * dataCacheRatio).toLong,
+      (totalUsableSize * 0.9 * (1 - dataCacheRatio)).toLong,
+      (totalUsableSize * 0.1).toLong)
   }
 
   override def memoryUsed: Long = _memoryUsed.get()
 
-  override def cacheMemory: Long = _cacheMemory
+  override def dataCacheMemory: Long = _dataCacheMemory
+
+  override def indexCacheMemory: Long = _indexCacheMemory
 
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
