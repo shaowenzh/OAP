@@ -48,8 +48,8 @@ class FiberCacheManagerSuite extends SharedOapContext {
   private def dataCacheRatio =
     SparkEnv.get.conf.getDouble(OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.key,
       OapConf.OAP_DATAFIBER_USE_FIBERCACHE_RATIO.defaultValue.get)
-  private def dataCacheMemorySize = (memoryManager.cacheMemory * dataCacheRatio).toLong
-  private def indexCacheMemorySize = memoryManager.cacheMemory - dataCacheMemorySize
+  private def dataCacheMemorySize = memoryManager.dataCacheMemory
+  private def indexCacheMemorySize = memoryManager.indexCacheMemory
 
   test("unit test") {
     val dataMemorySizeInMB = (dataCacheMemorySize / mbSize).toInt

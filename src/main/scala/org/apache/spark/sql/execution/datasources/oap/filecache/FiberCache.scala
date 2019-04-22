@@ -153,7 +153,12 @@ object FiberCache {
   //  For test purpose :convert Array[Byte] to FiberCache
   private[oap] def apply(data: Array[Byte]): FiberCache = {
     val memoryBlockHolder =
-      MemoryBlockHolder(data, Platform.BYTE_ARRAY_OFFSET, data.length, data.length)
+      MemoryBlockHolder(
+        CacheEnum.GENERAL,
+        data,
+        Platform.BYTE_ARRAY_OFFSET,
+        data.length,
+        data.length)
     FiberCache(memoryBlockHolder)
   }
 }
