@@ -301,15 +301,13 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 }
 
 /**
- * An memory manager contains different memory manager for index and data.
+ * A memory manager contains different sub memory manager for index and data.
  */
 private[filecache] class MixMemoryManager(sparkEnv: SparkEnv)
   extends MemoryManager with Logging {
 
-  // TODO: a config to control max memory size
   private val (indexMemoryManager, dataMemoryManager) = init()
 
-  // TODO: Atomic is really needed?
   private val _memoryUsed = new AtomicLong(0)
 
   override def memoryUsed: Long = _memoryUsed.get()
@@ -349,9 +347,12 @@ private[filecache] class MixMemoryManager(sparkEnv: SparkEnv)
     throw new UnsupportedOperationException("Can't do direct allocate for MixedMemoryManager")
   }
 
-  /**
-   * Used by IndexFile. For decompressed data
-   */
+  override def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
+    val bytes = new Array[Byte](length)
+    in.readFully(position, bytes)
+    toIndexFiberCache(bytes)
+  }
+
   override def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
     val block = indexMemoryManager.allocate(bytes.length)
     Platform.copyMemory(
@@ -364,10 +365,6 @@ private[filecache] class MixMemoryManager(sparkEnv: SparkEnv)
     FiberCache(block)
   }
 
-  /**
-   * Used by OapDataFile since we need to parse the raw data in on-heap memory before put it into
-   * off-heap memory
-   */
   override def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
     val block = dataMemoryManager.allocate(bytes.length)
     Platform.copyMemory(
