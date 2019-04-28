@@ -147,6 +147,11 @@ case class FiberCache(protected val fiberData: MemoryBlockHolder) extends Loggin
   // Return the occupied size and it's typically larger than the required data size due to memory
   // alignments from underlying allocator
   def getOccupiedSize(): Long = fiberData.occupiedSize
+
+  def setMemBlockCacheType(cacheType: CacheEnum.CacheEnum): FiberCache = {
+    this.fiberData.cacheType = cacheType
+    this
+  }
 }
 
 object FiberCache {
