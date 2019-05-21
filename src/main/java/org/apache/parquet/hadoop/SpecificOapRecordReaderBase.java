@@ -89,4 +89,8 @@ public abstract class SpecificOapRecordReaderBase<T> implements RecordReader<T> 
         reader = null;
       }
     }
+
+    public long totalRowSize() {
+      return this.totalRowCount;
+    }
 }

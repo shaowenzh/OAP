@@ -90,6 +90,12 @@ private[oap] case class ParquetDataFile(
     inUseFiberCache.update(idx, fiberCache)
   }
 
+  private var skippedRowsSize: Long = 0L
+
+  def getSkippedRowsSize(): Long = {
+    this.skippedRowsSize
+  }
+
   def cache(groupId: Int, fiberId: Int): FiberCache = {
     if (fiberDataReader == null) {
       fiberDataReader =
@@ -136,6 +142,7 @@ private[oap] case class ParquetDataFile(
       rowIds: Array[Int],
       filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
     if (rowIds == null || rowIds.length == 0) {
+      skippedRowsSize += totalRows()
       new OapCompletionIterator(Iterator.empty, {})
     } else {
       val iterator = context match {
@@ -146,20 +153,29 @@ private[oap] case class ParquetDataFile(
           if (parquetDataCacheEnable &&
             !meta.footer.getBlocks.asScala.exists(_.getRowCount > Int.MaxValue)) {
             addRequestSchemaToConf(configuration, requiredIds)
-            initCacheReader(requiredIds, c,
-              new IndexedVectorizedCacheReader(configuration,
-                meta.footer.toParquetMetadata(rowIds), this, requiredIds))
+            val reader = new IndexedVectorizedCacheReader(configuration,
+              meta.footer.toParquetMetadata(rowIds), this, requiredIds)
+            val iterator = initCacheReader(requiredIds, c, reader)
+            // To calculate rows skip size
+            skippedRowsSize += totalRows() - reader.totalRowSize()
+            iterator
           } else {
             addRequestSchemaToConf(configuration, requiredIds)
-            initVectorizedReader(c,
-              new IndexedVectorizedOapRecordReader(file,
-                configuration, meta.footer, rowIds))
+            val reader = new IndexedVectorizedOapRecordReader(file,
+              configuration, meta.footer, rowIds)
+            val iterator = initVectorizedReader(c, reader)
+            // To calculate rows skip size
+            skippedRowsSize += totalRows() - reader.totalRowSize()
+            iterator
           }
         case _ =>
           addRequestSchemaToConf(configuration, requiredIds)
-          initRecordReader(
-            new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
-              file, configuration, rowIds, meta.footer))
+          val reader = new IndexedMrOapRecordReader[UnsafeRow](new ParquetReadSupportWrapper,
+            file, configuration, rowIds, meta.footer)
+          val iterator = initRecordReader(reader)
+          // To calculate rows skip size
+          skippedRowsSize += totalRows() - reader.totalRowSize()
+          iterator
       }
       iterator.asInstanceOf[OapCompletionIterator[Any]]
     }

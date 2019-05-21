@@ -275,4 +275,8 @@ class VectorizedCacheReader(
     batchIdx = 0
     currentRowGroupRowsReturned += num
   }
+
+  def totalRowSize(): Long = {
+    return totalRowCount
+  }
 }

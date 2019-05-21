@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetricsManager}
+import org.apache.spark.sql.execution.datasources.oap.{OapFileFormat, OapMetricsManager, OptimizedParquetFileFormat}
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.oap.OapRuntime
@@ -326,12 +326,19 @@ case class FileSourceScanExec(
     inputRDD :: Nil
   }
 
-  override lazy val metrics =
-    Map("numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
+  override lazy val metrics = {
+    var mericsMap = Map(
+      "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
       "numFiles" -> SQLMetrics.createMetric(sparkContext, "number of files"),
       "metadataTime" -> SQLMetrics.createMetric(sparkContext, "metadata time (ms)"),
       "scanTime" -> SQLMetrics.createTimingMetric(sparkContext, "scan time")) ++
       OapMetricsManager.metrics(sparkContext)
+
+    if (relation.fileFormat.isInstanceOf[OptimizedParquetFileFormat]) {
+      mericsMap ++= OapMetricsManager.extraParquetMetrics(sparkContext)
+    }
+    mericsMap
+  }
 
   protected override def doExecute(): RDD[InternalRow] = {
     if (supportsBatch) {

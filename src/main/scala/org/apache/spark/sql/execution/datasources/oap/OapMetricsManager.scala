@@ -47,6 +47,8 @@ private[spark] class OapMetricsManager extends Serializable {
   private var _rowsReadWhenIgnoreIndex: Option[SQLMetric] = None
   private var _rowsReadWhenMissIndex: Option[SQLMetric] = None
 
+  private var _fileScanRowSkipCount: Option[SQLMetric] = None
+
   def initMetrics(metrics: Map[String, SQLMetric]): Unit = {
     // set task-level Accumulator
     _totalTasks = Some(metrics(OapMetricsManager.totalTasksName))
@@ -62,6 +64,10 @@ private[spark] class OapMetricsManager extends Serializable {
     _rowsSkippedWhenHitIndex = Some(metrics(OapMetricsManager.rowsSkippedWhenHitIndexName))
     _rowsReadWhenIgnoreIndex = Some(metrics(OapMetricsManager.rowsReadWhenIgnoreIndexName))
     _rowsReadWhenMissIndex = Some(metrics(OapMetricsManager.rowsReadWhenMissIndexName))
+
+    if (metrics.contains(OapMetricsManager.fileScanRowSkipCountName)) {
+      _fileScanRowSkipCount = Some(metrics(OapMetricsManager.fileScanRowSkipCountName))
+    }
   }
 
   def totalTasks: Option[SQLMetric] = _totalTasks
@@ -76,6 +82,8 @@ private[spark] class OapMetricsManager extends Serializable {
   def rowsSkippedWhenHitIndex: Option[SQLMetric] = _rowsSkippedWhenHitIndex
   def rowsReadWhenIgnoreIndex: Option[SQLMetric] = _rowsReadWhenIgnoreIndex
   def rowsReadWhenMissIndex: Option[SQLMetric] = _rowsReadWhenMissIndex
+
+  def dataRowScanCount: Option[SQLMetric] = _fileScanRowSkipCount
 
   private def hitIndex(readRows: Long, skippedRows: Long): Unit = {
     _hitIndexTasks.foreach(_.add(1L))
@@ -115,6 +123,10 @@ private[spark] class OapMetricsManager extends Serializable {
         missIndex(totalRows)
     }
   }
+
+  def updateFileScanRowSkipCount(skipRows: Long): Unit = {
+    _fileScanRowSkipCount.foreach(_.add(skipRows))
+  }
 }
 
 private[sql] object OapMetricsManager {
@@ -129,6 +141,8 @@ private[sql] object OapMetricsManager {
   val rowsSkippedWhenHitIndexName = "rowsSkippedWhenHitIndex"
   val rowsReadWhenIgnoreIndexName = "rowsReadWhenIgnoreIndex"
   val rowsReadWhenMissIndexName = "rowsReadWhenMissIndex"
+
+  val fileScanRowSkipCountName = "fileScanRowSkipCount"
 
   def metrics(sparkContext: SparkContext): Map[String, SQLMetric] =
     Map(totalTasksName ->
@@ -154,5 +168,10 @@ private[sql] object OapMetricsManager {
         SQLMetrics.createMetric(sparkContext, "OAP:rows read when ignore index"),
       rowsReadWhenMissIndexName ->
         SQLMetrics.createMetric(sparkContext, "OAP:rows read when miss index")
+    )
+
+  def extraParquetMetrics(sparkContext: SparkContext): Map[String, SQLMetric] =
+    Map(fileScanRowSkipCountName ->
+      SQLMetrics.createMetric(sparkContext, "OAP:rows skipped when read from file")
     )
 }

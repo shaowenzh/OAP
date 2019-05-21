@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.api.RecordReader;
+import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetFooter;
 
 public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
@@ -37,6 +38,8 @@ public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
     private InternalOapRecordReader<T> internalReader;
 
     private ReadSupport<T> readSupport;
+
+    protected long totalRowCount;
 
     public IndexedMrOapRecordReader(
         ReadSupport<T> readSupport,
@@ -70,10 +73,19 @@ public class IndexedMrOapRecordReader<T> implements RecordReader<T> {
       this.internalReader = new InternalOapRecordReader<>(readSupport);
       this.internalReader.initialize(reader, configuration);
 
+      totalRowCount = 0L;
+      for (BlockMetaData block : reader.getRowGroups()) {
+        this.totalRowCount += block.getRowCount();
+      }
+
     }
 
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
       return internalReader.nextKeyValue();
+    }
+
+    public long totalRowSize() {
+      return this.totalRowCount;
     }
 }

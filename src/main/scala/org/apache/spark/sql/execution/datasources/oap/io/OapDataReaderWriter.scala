@@ -303,6 +303,10 @@ private[oap] class OapDataReaderV1(
         val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
         val rows = getRowIds(options)
         val iter = fileScanner.iteratorWithRowIds(requiredIds, rows, filters)
+        if (fileScanner.isInstanceOf[ParquetDataFile]) {
+          metrics.updateFileScanRowSkipCount(
+            fileScanner.asInstanceOf[ParquetDataFile].getSkippedRowsSize())
+        }
         val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
 
         _indexStat = HIT_INDEX
