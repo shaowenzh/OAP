@@ -90,10 +90,10 @@ private[oap] case class ParquetDataFile(
     inUseFiberCache.update(idx, fiberCache)
   }
 
-  private var skippedRowsSize: Long = 0L
+  private var rowsScanCountFromFile: Long = 0L
 
-  def getSkippedRowsSize(): Long = {
-    this.skippedRowsSize
+  def getRowsScanCountFromFile(): Long = {
+    this.rowsScanCountFromFile
   }
 
   def cache(groupId: Int, fiberId: Int): FiberCache = {
@@ -142,7 +142,6 @@ private[oap] case class ParquetDataFile(
       rowIds: Array[Int],
       filters: Seq[Filter] = Nil): OapCompletionIterator[Any] = {
     if (rowIds == null || rowIds.length == 0) {
-      skippedRowsSize += totalRows()
       new OapCompletionIterator(Iterator.empty, {})
     } else {
       val iterator = context match {
@@ -157,7 +156,7 @@ private[oap] case class ParquetDataFile(
               meta.footer.toParquetMetadata(rowIds), this, requiredIds)
             val iterator = initCacheReader(requiredIds, c, reader)
             // To calculate rows skip size
-            skippedRowsSize += totalRows() - reader.totalRowSize()
+            rowsScanCountFromFile = reader.totalRowSize()
             iterator
           } else {
             addRequestSchemaToConf(configuration, requiredIds)
@@ -165,7 +164,7 @@ private[oap] case class ParquetDataFile(
               configuration, meta.footer, rowIds)
             val iterator = initVectorizedReader(c, reader)
             // To calculate rows skip size
-            skippedRowsSize += totalRows() - reader.totalRowSize()
+            rowsScanCountFromFile = reader.totalRowSize()
             iterator
           }
         case _ =>
@@ -174,7 +173,7 @@ private[oap] case class ParquetDataFile(
             file, configuration, rowIds, meta.footer)
           val iterator = initRecordReader(reader)
           // To calculate rows skip size
-          skippedRowsSize += totalRows() - reader.totalRowSize()
+          rowsScanCountFromFile = reader.totalRowSize()
           iterator
       }
       iterator.asInstanceOf[OapCompletionIterator[Any]]
