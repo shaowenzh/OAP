@@ -304,7 +304,7 @@ private[oap] class OapDataReaderV1(
         val rows = getRowIds(options)
         val iter = fileScanner.iteratorWithRowIds(requiredIds, rows, filters)
         if (fileScanner.isInstanceOf[ParquetDataFile]) {
-          metrics.updateFileScanRowCount(
+          metrics.updateBinaryRowCount(
             fileScanner.asInstanceOf[ParquetDataFile].getRowsScanCountFromFile())
         }
         val end = if (log.isDebugEnabled) System.currentTimeMillis else 0

@@ -47,7 +47,7 @@ private[spark] class OapMetricsManager extends Serializable {
   private var _rowsReadWhenIgnoreIndex: Option[SQLMetric] = None
   private var _rowsReadWhenMissIndex: Option[SQLMetric] = None
 
-  private var _fileScanRowCount: Option[SQLMetric] = None
+  private var _binaryRowCount: Option[SQLMetric] = None
 
   def initMetrics(metrics: Map[String, SQLMetric]): Unit = {
     // set task-level Accumulator
@@ -65,8 +65,8 @@ private[spark] class OapMetricsManager extends Serializable {
     _rowsReadWhenIgnoreIndex = Some(metrics(OapMetricsManager.rowsReadWhenIgnoreIndexName))
     _rowsReadWhenMissIndex = Some(metrics(OapMetricsManager.rowsReadWhenMissIndexName))
 
-    if (metrics.contains(OapMetricsManager.fileScanRowCountName)) {
-      _fileScanRowCount = Some(metrics(OapMetricsManager.fileScanRowCountName))
+    if (metrics.contains(OapMetricsManager.binaryRowCountName)) {
+      _binaryRowCount = Some(metrics(OapMetricsManager.binaryRowCountName))
     }
   }
 
@@ -83,7 +83,7 @@ private[spark] class OapMetricsManager extends Serializable {
   def rowsReadWhenIgnoreIndex: Option[SQLMetric] = _rowsReadWhenIgnoreIndex
   def rowsReadWhenMissIndex: Option[SQLMetric] = _rowsReadWhenMissIndex
 
-  def dataRowScanCount: Option[SQLMetric] = _fileScanRowCount
+  def binaryRowCount: Option[SQLMetric] = _binaryRowCount
 
   private def hitIndex(readRows: Long, skippedRows: Long): Unit = {
     _hitIndexTasks.foreach(_.add(1L))
@@ -124,8 +124,8 @@ private[spark] class OapMetricsManager extends Serializable {
     }
   }
 
-  def updateFileScanRowCount(skipRows: Long): Unit = {
-    _fileScanRowCount.foreach(_.add(skipRows))
+  def updateBinaryRowCount(skipRows: Long): Unit = {
+    _binaryRowCount.foreach(_.add(skipRows))
   }
 }
 
@@ -142,7 +142,7 @@ private[sql] object OapMetricsManager {
   val rowsReadWhenIgnoreIndexName = "rowsReadWhenIgnoreIndex"
   val rowsReadWhenMissIndexName = "rowsReadWhenMissIndex"
 
-  val fileScanRowCountName = "fileScanRowCount"
+  val binaryRowCountName = "binaryRowCount"
 
   def metrics(sparkContext: SparkContext): Map[String, SQLMetric] =
     Map(totalTasksName ->
@@ -171,7 +171,7 @@ private[sql] object OapMetricsManager {
     )
 
   def extraParquetMetrics(sparkContext: SparkContext): Map[String, SQLMetric] =
-    Map(fileScanRowCountName ->
-      SQLMetrics.createMetric(sparkContext, "OAP:rows read from file")
+    Map(binaryRowCountName ->
+      SQLMetrics.createMetric(sparkContext, "OAP:binary row count when read from file")
     )
 }
