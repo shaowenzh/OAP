@@ -133,6 +133,14 @@ object OapConf {
       .doubleConf
       .createWithDefault(0.8)
 
+  val OAP_INDEX_DATA_SEPARATION_ENABLE =
+    SqlConfAdapter.buildConf("spark.sql.oap.index.data.cache.separation.enable")
+      .internal()
+      .doc("This is to enable index and data cache separation feature for offheap and pm, " +
+        "not for MixMemoryManager")
+      .booleanConf
+      .createWithDefault(true)
+
   val OAP_FIBERCACHE_MEMORY_MANAGER =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.memory.manager")
       .internal()

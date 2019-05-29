@@ -48,6 +48,7 @@ class FiberCacheManagerSummary private[spark](
     val id: String,
     val hostPort: String,
     val isActive: Boolean,
+    val indexDataCacheSeparationEnable: Boolean,
     val memoryUsed: Long,
     val maxMemory: Long,
     val cacheSize: Long,

@@ -104,10 +104,15 @@ private[sql] class FiberCacheManager(
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
     if (cacheName.equals(GUAVA_CACHE)) {
+      val indexDataSeparationEnable = sparkEnv.conf.getBoolean(
+        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
+        OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
+      )
       new GuavaOapCache(
         memoryManager.dataCacheMemory,
         memoryManager.indexCacheMemory,
-        memoryManager.cacheGuardianMemory)
+        memoryManager.cacheGuardianMemory,
+        indexDataSeparationEnable)
     } else if (cacheName.equals(SIMPLE_CACHE)) {
       new SimpleOapCache()
     } else {
