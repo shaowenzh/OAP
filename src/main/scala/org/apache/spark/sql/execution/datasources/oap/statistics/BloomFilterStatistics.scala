@@ -127,9 +127,8 @@ private[oap] class BloomFilterStatisticsWriter(
     projectors.foreach(p => bfIndex.addValue(p(key).getBytes))
   }
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-
+  private def internalWrite(writer: OutputStream, offsetP: Int): Int = {
+    var offset = offsetP
     // Bloom filter index file format:
     // numOfLong            4 Bytes, Int, record the total number of Longs in bit array
     // numOfHashFunction    4 Bytes, Int, record the total number of Hash Functions
@@ -149,5 +148,15 @@ private[oap] class BloomFilterStatisticsWriter(
       offset += 8
     })
     offset
+  }
+
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    val offset = super.write(writer, sortedKeys)
+    internalWrite(writer, offset)
+  }
+
+  override def write(writer: OutputStream, sortedIter: Iterator[Product2[Key, Seq[Int]]]): Int = {
+    val offset = super.write(writer, sortedIter)
+    internalWrite(writer, offset)
   }
 }

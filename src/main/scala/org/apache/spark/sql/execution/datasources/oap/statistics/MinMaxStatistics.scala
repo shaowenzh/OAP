@@ -104,8 +104,8 @@ private[oap] class MinMaxStatisticsWriter(
     }
   }
 
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
+  private def internalWrite(writer: OutputStream, offsetP: Int): Int = {
+    var offset = offsetP
     if (min != null) {
       val tempWriter = new ByteArrayOutputStream()
       nnkw.writeKey(tempWriter, min)
@@ -121,5 +121,15 @@ private[oap] class MinMaxStatisticsWriter(
       offset += IndexUtils.INT_SIZE
     }
     offset
+  }
+
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    val offset = super.write(writer, sortedKeys)
+    internalWrite(writer, offset)
+  }
+
+  override def write(writer: OutputStream, sortedIter: Iterator[Product2[Key, Seq[Int]]]): Int = {
+    val offset = super.write(writer, sortedIter)
+    internalWrite(writer, offset)
   }
 }

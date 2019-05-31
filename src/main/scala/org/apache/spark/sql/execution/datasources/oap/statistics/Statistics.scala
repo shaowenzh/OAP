@@ -84,6 +84,11 @@ abstract class StatisticsWriter(schema: StructType, conf: Configuration) {
     IndexUtils.writeInt(writer, id)
     4
   }
+
+  def write(writer: OutputStream, sortedIter: Iterator[Product2[Key, Seq[Int]]]): Int = {
+    IndexUtils.writeInt(writer, id)
+    4
+  }
 }
 
 // tool function for Statistics class

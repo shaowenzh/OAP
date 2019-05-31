@@ -18,6 +18,7 @@ package org.apache.spark.sql.execution.datasources.oap.statistics
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
@@ -87,21 +88,9 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
 
   protected var sampleArray: Array[Key] = _
 
-  // SampleBasedStatistics file structure
-  // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
-  // sample_size          4 Bytes, Int, number of UnsafeRow
-  //
-  // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |   (4 + u1_sizeInBytes) Bytes, unsafeRow-1
-  // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |   (4 + u2_sizeInBytes) Bytes, unsafeRow-2
-  // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
-  // ...
-  // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
-  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
-    var offset = super.write(writer, sortedKeys)
-    val size = math.max(
-      (sortedKeys.size * sampleRate).toInt, math.min(minSampleSize, sortedKeys.size))
-    sampleArray = takeSample(sortedKeys, size)
-
+  private def internalWrite(writer: OutputStream, offsetP: Int, sizeP: Int): Int = {
+    var offset = offsetP
+    val size = sizeP
     IndexUtils.writeInt(writer, size)
     offset += IndexUtils.INT_SIZE
     val tempWriter = new ByteArrayOutputStream()
@@ -115,6 +104,45 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
     offset
   }
 
+  // SampleBasedStatistics file structure
+  // statistics_id        4 Bytes, Int, specify the [[Statistic]] type
+  // sample_size          4 Bytes, Int, number of UnsafeRow
+  //
+  // | unsafeRow-1 sizeInBytes | unsafeRow-1 content |   (4 + u1_sizeInBytes) Bytes, unsafeRow-1
+  // | unsafeRow-2 sizeInBytes | unsafeRow-2 content |   (4 + u2_sizeInBytes) Bytes, unsafeRow-2
+  // | unsafeRow-3 sizeInBytes | unsafeRow-3 content |   (4 + u3_sizeInBytes) Bytes, unsafeRow-3
+  // ...
+  // | unsafeRow-(sample_size) sizeInBytes | unsafeRow-(sample_size) content |
+  override def write(writer: OutputStream, sortedKeys: ArrayBuffer[Key]): Int = {
+    val offset = super.write(writer, sortedKeys)
+    val size = math.max(
+      (sortedKeys.size * sampleRate).toInt, math.min(minSampleSize, sortedKeys.size))
+    sampleArray = takeSample(sortedKeys, size)
+
+    internalWrite(writer, offset, size)
+  }
+
   protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
+
+  override def write(writer: OutputStream, sortedIter: Iterator[Product2[Key, Seq[Int]]]): Int = {
+    val offset = super.write(writer, sortedIter)
+    val keySize = sortedIter.size
+    val size = math.max(
+      (keySize * sampleRate).toInt, math.min(minSampleSize, keySize))
+    sampleArray = takeSample(sortedIter, size, keySize)
+
+    internalWrite(writer, offset, size)
+  }
+
+  protected def takeSample(
+    sortedIter: Iterator[Product2[Key, Seq[Int]]],
+    size: Int,
+    keySize: Int): Array[InternalRow] = {
+    val hashset: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
+    while(hashset.size < size) {
+      hashset.add(Random.nextInt((keySize - 1)))
+    }
+    sortedIter.zipWithIndex.filter(v => hashset.contains(v._2)).map(_._1._1).toArray
+  }
 }

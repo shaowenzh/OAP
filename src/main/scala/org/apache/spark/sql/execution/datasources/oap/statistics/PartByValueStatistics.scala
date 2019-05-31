@@ -203,6 +203,51 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     offset
   }
 
+  override def write(writer: OutputStream, sortedIter: Iterator[Product2[Key, Seq[Int]]]): Int = {
+    var offset = super.write(writer, sortedIter)
+    val hashMap = new java.util.HashMap[Key, Int]()
+    val uniqueKeys: ArrayBuffer[Key] = new ArrayBuffer[Key]()
+
+    var prev: Key = null
+    var prevCnt: Int = 0
+
+    for (key <- sortedIter) {
+      if (prev == null) {
+        prev = key._1
+        prevCnt += 1
+      } else {
+        if (ordering.compare(prev, key._1) == 0) prevCnt += 1
+        else {
+          hashMap.put(prev, prevCnt)
+          uniqueKeys.append(prev)
+          prevCnt = 1
+          prev = key._1
+        }
+      }
+    }
+    if (prev != null) {
+      hashMap.put(prev, prevCnt)
+      uniqueKeys.append(prev)
+    }
+
+    buildPartMeta(uniqueKeys, hashMap)
+
+    // start writing
+    IndexUtils.writeInt(writer, metas.length)
+    offset += IndexUtils.INT_SIZE
+    val tempWriter = new ByteArrayOutputStream()
+    metas.foreach(meta => {
+      nnkw.writeKey(tempWriter, meta.row)
+      IndexUtils.writeInt(writer, meta.curMaxId)
+      IndexUtils.writeInt(writer, meta.accumulatorCnt)
+      IndexUtils.writeInt(writer, tempWriter.size())
+      offset += 12
+    })
+    writer.write(tempWriter.toByteArray)
+    offset += tempWriter.size
+    offset
+  }
+
   // TODO needs refactor, kept for easy debug
   private def buildPartMeta(uniqueKeys: ArrayBuffer[Key], hashMap: java.util.HashMap[Key, Int]) = {
     val size = hashMap.size()

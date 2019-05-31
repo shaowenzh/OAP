@@ -23,12 +23,15 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.{Aggregator, TaskContext}
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
+import org.apache.spark.util.collection.OapExternalSorter
 
 /**
  * Statistics write:
@@ -46,9 +49,24 @@ class StatisticsWriteManager {
   // share key store for all statistics
   // for MinMax and BloomFilter, this is not necessary
   // but for SampleBase and PartByValue, this is needed
-  protected var content: ArrayBuffer[Key] = _
+
+  // protected var content: ArrayBuffer[Key] = _
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
+
+  private val combiner: Int => Seq[Int] = Seq(_)
+  private val merger: (Seq[Int], Int) => Seq[Int] = _ :+ _
+  private val mergeCombiner: (Seq[Int], Seq[Int]) => Seq[Int] = _ ++ _
+  private val aggregator =
+    new Aggregator[InternalRow, Int, Seq[Int]](combiner, merger, mergeCombiner)
+  private val externalSorter = {
+    val taskContext = TaskContext.get()
+    val sorter = new OapExternalSorter[InternalRow, Int, Seq[Int]](
+      taskContext, Some(aggregator), Some(ordering))
+    taskContext.addTaskCompletionListener(_ => sorter.stop())
+    sorter
+  }
+  private var recordCount: Int = 0
 
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
   // which is created from `SparkUtils`, hence containing all spark config values.
@@ -63,7 +81,7 @@ class StatisticsWriteManager {
       case StatisticsType(st) => st(s, conf)
       case t => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     }
-    content = new ArrayBuffer[Key]()
+    // content = new ArrayBuffer[Key]()
   }
 
   def addOapKey(key: Key): Unit = {
@@ -71,7 +89,8 @@ class StatisticsWriteManager {
       // stats info does not collect null keys
       return
     }
-    content.append(key)
+    // content.append(key)
+    externalSorter.insert(key, recordCount)
     stats.foreach(_.addOapKey(key))
   }
 
@@ -88,16 +107,17 @@ class StatisticsWriteManager {
       offset += 4
     }
 
-    val sortedKeys = sortKeys
+    // val sortedKeys = sortKeys
+    val sortedIter = externalSorter.iterator
     stats.foreach { stat =>
-      val off = stat.write(out, sortedKeys)
+      val off = stat.write(out, sortedIter)
       assert(off >= 0)
       offset += off
     }
     offset
   }
 
-  private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
+  // private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 }
 
 object StatisticsManager {
