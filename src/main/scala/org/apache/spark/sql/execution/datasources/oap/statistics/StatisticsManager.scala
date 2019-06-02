@@ -42,31 +42,16 @@ import org.apache.spark.util.collection.OapExternalSorter
  * statisticsManager.write(out)
  * }}}
  */
-class StatisticsWriteManager {
+class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int, Seq[Int]]) {
   protected var stats: Array[StatisticsWriter] = _
   protected var schema: StructType = _
 
   // share key store for all statistics
   // for MinMax and BloomFilter, this is not necessary
   // but for SampleBase and PartByValue, this is needed
-
-  // protected var content: ArrayBuffer[Key] = _
+  protected var content: ArrayBuffer[Key] = _
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
-
-  private val combiner: Int => Seq[Int] = Seq(_)
-  private val merger: (Seq[Int], Int) => Seq[Int] = _ :+ _
-  private val mergeCombiner: (Seq[Int], Seq[Int]) => Seq[Int] = _ ++ _
-  private val aggregator =
-    new Aggregator[InternalRow, Int, Seq[Int]](combiner, merger, mergeCombiner)
-  private val externalSorter = {
-    val taskContext = TaskContext.get()
-    val sorter = new OapExternalSorter[InternalRow, Int, Seq[Int]](
-      taskContext, Some(aggregator), Some(ordering))
-    taskContext.addTaskCompletionListener(_ => sorter.stop())
-    sorter
-  }
-  private var recordCount: Int = 0
 
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
   // which is created from `SparkUtils`, hence containing all spark config values.
@@ -89,8 +74,7 @@ class StatisticsWriteManager {
       // stats info does not collect null keys
       return
     }
-    // content.append(key)
-    externalSorter.insert(key, recordCount)
+    content.append(key)
     stats.foreach(_.addOapKey(key))
   }
 
@@ -117,7 +101,7 @@ class StatisticsWriteManager {
     offset
   }
 
-  // private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
+  private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 }
 
 object StatisticsManager {
