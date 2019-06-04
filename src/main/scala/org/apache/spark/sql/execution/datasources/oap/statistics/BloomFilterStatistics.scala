@@ -23,6 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -32,7 +33,7 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
 
 private[oap] class BloomFilterStatisticsReader(
-  schema: StructType) extends StatisticsReader(schema) {
+  schema: StructType) extends StatisticsReader(schema) with Logging {
   override val id: Int = StatisticsType.TYPE_BLOOM_FILTER
 
   protected var bfIndex: BloomFilter = _
@@ -98,8 +99,10 @@ private[oap] class BloomFilterStatisticsReader(
     }
 
     if (skipIndex) {
+      logInfo("Skip Index")
       StatsAnalysisResult.SKIP_INDEX
     } else {
+      logInfo("Use Index")
       StatsAnalysisResult.USE_INDEX
     }
   }
@@ -155,8 +158,8 @@ private[oap] class BloomFilterStatisticsWriter(
     internalWrite(writer, offset)
   }
 
-  override def write(writer: OutputStream, sortedIter: Iterator[Product2[Key, Seq[Int]]]): Int = {
-    val offset = super.write(writer, sortedIter)
+  override def customWrite(writer: OutputStream): Int = {
+    val offset = super.customWrite(writer)
     internalWrite(writer, offset)
   }
 }

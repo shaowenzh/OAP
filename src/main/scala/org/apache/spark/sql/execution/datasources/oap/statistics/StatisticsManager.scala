@@ -24,6 +24,7 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.{Aggregator, TaskContext}
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -42,7 +43,7 @@ import org.apache.spark.util.collection.OapExternalSorter
  * statisticsManager.write(out)
  * }}}
  */
-class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int, Seq[Int]]) {
+class StatisticsWriteManager {
   protected var stats: Array[StatisticsWriter] = _
   protected var schema: StructType = _
 
@@ -53,9 +54,15 @@ class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int,
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
+  private var isExternalSorterEnable = false
+
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
   // which is created from `SparkUtils`, hence containing all spark config values.
   def initialize(indexType: OapIndexType, s: StructType, conf: Configuration): Unit = {
+    isExternalSorterEnable = conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
+      OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get
+    )
+
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
       val typeFromConfig = conf.get(OapConf.OAP_STATISTICS_TYPES.key,
         OapConf.OAP_STATISTICS_TYPES.defaultValueString).split(",").map(_.trim)
@@ -66,7 +73,7 @@ class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int,
       case StatisticsType(st) => st(s, conf)
       case t => throw new UnsupportedOperationException(s"non-supported statistic type $t")
     }
-    // content = new ArrayBuffer[Key]()
+    content = new ArrayBuffer[Key]()
   }
 
   def addOapKey(key: Key): Unit = {
@@ -74,7 +81,9 @@ class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int,
       // stats info does not collect null keys
       return
     }
-    content.append(key)
+    if (!isExternalSorterEnable) {
+      content.append(key)
+    }
     stats.foreach(_.addOapKey(key))
   }
 
@@ -91,12 +100,19 @@ class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int,
       offset += 4
     }
 
-    // val sortedKeys = sortKeys
-    val sortedIter = externalSorter.iterator
-    stats.foreach { stat =>
-      val off = stat.write(out, sortedIter)
-      assert(off >= 0)
-      offset += off
+    if (isExternalSorterEnable) {
+      stats.foreach { stat =>
+        val off = stat.customWrite(out)
+        assert(off >= 0)
+        offset += off
+      }
+    } else {
+      val sortedKeys = sortKeys
+      stats.foreach { stat =>
+        val off = stat.write(out, sortedKeys)
+        assert(off >= 0)
+        offset += off
+      }
     }
     offset
   }
@@ -104,7 +120,7 @@ class StatisticsWriteManager(externalSorter: OapExternalSorter[InternalRow, Int,
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 }
 
-object StatisticsManager {
+object StatisticsManager extends Logging{
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
   val statisticsTypeMap: scala.collection.mutable.Map[OapIndexType, Array[String]] =
@@ -140,6 +156,7 @@ object StatisticsManager {
       stats: Array[StatisticsReader],
       intervalArray: ArrayBuffer[RangeInterval],
       conf: Configuration): StatsAnalysisResult = {
+    logInfo("start statistic analyse")
     val fullScanThreshold = conf.getDouble(
       OapConf.OAP_FULL_SCAN_THRESHOLD.key, OapConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get)
     val analysisResults = stats.map(_.analyse(intervalArray))
