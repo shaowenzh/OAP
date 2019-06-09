@@ -23,7 +23,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{Aggregator, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
@@ -32,7 +31,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.collection.OapExternalSorter
 
 // PartedByValueStatistics gives statistics with the value interval.
 // for example, in an array where all internal rows appear only once
@@ -166,34 +164,6 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
 
   protected lazy val metas: ArrayBuffer[PartedByValueMeta] = new ArrayBuffer[PartedByValueMeta]()
 
-  protected var isExternalSorterEnable =
-    conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
-    OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get)
-  protected val combiner: Int => Seq[Int] = Seq(_)
-  protected val merger: (Seq[Int], Int) => Seq[Int] = _ :+ _
-  protected val mergeCombiner: (Seq[Int], Seq[Int]) => Seq[Int] = _ ++ _
-  protected val aggregator =
-    new Aggregator[InternalRow, Int, Seq[Int]](combiner, merger, mergeCombiner)
-  protected var externalSorter = {
-    if (isExternalSorterEnable) {
-      val taskContext = TaskContext.get()
-      val sorter = new OapExternalSorter[InternalRow, Int, Seq[Int]](
-        taskContext, Some(aggregator), Some(ordering))
-      taskContext.addTaskCompletionListener(_ => sorter.stop())
-      sorter
-    } else {
-      null
-    }
-  }
-  private var recordCount: Int = 0
-
-  override def addOapKey(key: Key): Unit = {
-    if (isExternalSorterEnable) {
-      externalSorter.insert(key, recordCount)
-      recordCount += 1
-    }
-  }
-
   private def internalWrite(writer: OutputStream, offsetP: Int): Int = {
     var offset = offsetP
     IndexUtils.writeInt(writer, metas.length)
@@ -243,14 +213,6 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     internalWrite(writer, offset)
   }
 
-  /*
-  override def customWrite(writer: OutputStream): Int = {
-    val offset = super.customWrite(writer)
-    buildPartMeta3()
-    internalWrite(writer, offset)
-  }
-  */
-
   // TODO needs refactor, kept for easy debug
   private def buildPartMeta(uniqueKeys: ArrayBuffer[Key], hashMap: java.util.HashMap[Key, Int]) = {
     val size = hashMap.size()
@@ -281,48 +243,8 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     }
   }
 
-  /*
-  private def buildPartMeta2() = {
-    val sortedIter = externalSorter.iterator
-    val size = externalSorter.getDistinctCount
-    if (size > 0) {
-      val partNum = if (size > maxPartNum) maxPartNum else size
-      val perSize = size / partNum
-
-      var i = 0
-      var count = 0
-      var index = i * perSize
-      var prev: Key = null
-      var cur: Key = null
-      var key: Key = null
-      var begin = 0
-
-      while (sortedIter.hasNext) {
-        key = sortedIter.next()._1
-        if (cur == null) {
-          cur = key
-          begin += 1
-        } else {
-          if (ordering.compare(cur, key) != 0) {
-            prev = cur
-            cur = key
-            begin += 1
-          }
-        }
-        count += 1
-        if (begin > (index + 1)) {
-          metas.append(PartedByValueMeta(i, prev, index, (count - 1)))
-          i += 1
-          index = i * perSize
-        }
-      }
-      metas.append(PartedByValueMeta(i, cur, size - 1, count))
-    }
-  }
-  */
-
-  override def customWrite(writer: OutputStream): Int = {
-    val offset = super.customWrite(writer)
+  override def write2(writer: OutputStream): Int = {
+    val offset = super.write2(writer)
     internalWrite(writer, offset)
   }
 
@@ -367,37 +289,6 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
       }
     }
   }
-
-  /*
-  private def buildPartMeta3() = {
-    val sortedIter = externalSorter.iterator
-    val size = externalSorter.getDistinctCount
-    if (size > 0) {
-      val partNum = if (size > maxPartNum) maxPartNum else size
-      val perSize = size / partNum
-
-      var i = 0
-      var count = 0
-      var index = i * perSize
-      var kv: Product2[Key, Seq[Int]] = null
-      var begin = 0
-
-      while (sortedIter.hasNext) {
-        kv = sortedIter.next()
-        begin += 1
-        count += kv._2.size
-        if ((begin - 1) >= index) {
-          metas.append(PartedByValueMeta(i, kv._1, index, count))
-          i += 1
-          index = i * perSize
-        }
-      }
-      if ((begin - 1) > (i - 1) * perSize) {
-        metas.append(PartedByValueMeta(i, kv._1, size - 1, count))
-      }
-    }
-  } */
-
 }
 
 private[oap] case class PartedByValueMeta(

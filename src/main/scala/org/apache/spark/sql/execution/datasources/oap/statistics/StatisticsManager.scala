@@ -23,16 +23,13 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{Aggregator, TaskContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types._
-import org.apache.spark.util.collection.OapExternalSorter
 
 /**
  * Statistics write:
@@ -62,7 +59,7 @@ class StatisticsWriteManager {
   def initialize(indexType: OapIndexType, s: StructType, conf: Configuration): Unit = {
     _isExternalSorterEnable = conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
       OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get
-    )
+    ) && indexType.toString.equals(BTreeIndexType.toString)
 
     val statsTypes = StatisticsManager.statisticsTypeMap(indexType).filter { statType =>
       val typeFromConfig = conf.get(OapConf.OAP_STATISTICS_TYPES.key,
@@ -103,7 +100,7 @@ class StatisticsWriteManager {
 
     if (_isExternalSorterEnable) {
       stats.foreach { stat =>
-        val off = stat.customWrite(out)
+        val off = stat.write2(out)
         assert(off >= 0)
         offset += off
       }

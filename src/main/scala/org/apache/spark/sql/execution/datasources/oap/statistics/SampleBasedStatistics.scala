@@ -24,7 +24,6 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{Aggregator, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
@@ -33,7 +32,6 @@ import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.collection.OapExternalSorter
 
 private[oap] class SampleBasedStatisticsReader(
     schema: StructType) extends StatisticsReader(schema) with Logging{
@@ -95,36 +93,6 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
 
   protected var sampleArray: Array[Key] = _
 
-  protected var isExternalSorterEnable =
-    conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
-    OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get)
-
-  @transient private lazy val ordering = GenerateOrdering.create(schema)
-  protected val combiner: Int => Seq[Int] = Seq(_)
-  protected val merger: (Seq[Int], Int) => Seq[Int] = _ :+ _
-  protected val mergeCombiner: (Seq[Int], Seq[Int]) => Seq[Int] = _ ++ _
-  protected val aggregator =
-    new Aggregator[InternalRow, Int, Seq[Int]](combiner, merger, mergeCombiner)
-  protected var externalSorter = {
-      if (isExternalSorterEnable) {
-      val taskContext = TaskContext.get()
-      val sorter = new OapExternalSorter[InternalRow, Int, Seq[Int]](
-        taskContext, Some(aggregator), Some(ordering))
-      taskContext.addTaskCompletionListener(_ => sorter.stop())
-      sorter
-    } else {
-      null
-    }
-  }
-  private var recordCount: Int = 0
-
-  override def addOapKey(key: Key): Unit = {
-    if (isExternalSorterEnable) {
-      externalSorter.insert(key, recordCount)
-      recordCount += 1
-    }
-  }
-
   private def internalWrite(writer: OutputStream, offsetP: Int, sizeP: Int): Int = {
     var offset = offsetP
     val size = sizeP
@@ -162,58 +130,12 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
   protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
 
-  /*
-  override def customWrite(writer: OutputStream): Int = {
-    val offset = super.customWrite(writer)
-    val sortedIter = externalSorter.iterator
-    val keySize = recordCount
-    val size = math.max(
-      (keySize * sampleRate).toInt, math.min(minSampleSize, keySize))
-    sampleArray = takeSample(sortedIter, size, keySize)
-    logInfo(s"write sampleArray size: ${sampleArray.size}")
-    internalWrite(writer, offset, sampleArray.size)
-  }
-  */
-
-  /*
-  protected def takeSample(
-    sortedIter: Iterator[Product2[Key, Seq[Int]]],
-    size: Int,
-    keySize: Int): Array[InternalRow] = {
-    // use Hashset only when sample size is much smaller than keySize
-    if (size == (keySize * sampleRate).toInt) {
-      val hashset: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
-      val keyBuffer: mutable.Buffer[Key] = mutable.Buffer.empty[Key]
-      while (hashset.size < size) {
-        hashset.add(Random.nextInt((keySize - 1)))
-      }
-      logInfo(s"use hashset: ${hashset.size}")
-
-      for(value <- sortedIter) {
-        value._2.foreach(
-          idx => {
-            if (hashset.contains(idx)) keyBuffer += value._1
-          }
-        )
-      }
-      keyBuffer.toArray
-
-      // sortedIter.zipWithIndex.filter(v => hashset.contains(v._2)).map(_._1._1).toArray
-    } else {
-      val dataList = sortedIter.toList
-      logInfo(s"use dataList: ${dataList.size}")
-      Random.shuffle(dataList.indices.toList)
-        .take(size).map(dataList(_)._1).toArray
-    }
-  }
-  */
-
   private var randomIdxArray: Array[Int] = _
   private var sampleArrayBuffer: ArrayBuffer[Key] = _
   private var keyCount: Int = 0
 
-  override def customWrite(writer: OutputStream): Int = {
-    val offset = super.customWrite(writer)
+  override def write2(writer: OutputStream): Int = {
+    val offset = super.write2(writer)
     sampleArray = sampleArrayBuffer.toArray
     sampleArrayBuffer = null
     logInfo(s"write sampleArray size: ${sampleArray.size}")

@@ -85,7 +85,8 @@ abstract class StatisticsWriter(schema: StructType, conf: Configuration) {
     4
   }
 
-  def customWrite(writer: OutputStream): Int = {
+  // this write2 methold is used when enable externalSorter
+  def write2(writer: OutputStream): Int = {
     IndexUtils.writeInt(writer, id)
     4
   }

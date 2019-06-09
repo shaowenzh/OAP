@@ -133,8 +133,8 @@ private[oap] class MinMaxStatisticsWriter(
     internalWrite(writer, offset)
   }
 
-  override def customWrite(writer: OutputStream): Int = {
-    val offset = super.customWrite(writer)
+  override def write2(writer: OutputStream): Int = {
+    val offset = super.write2(writer)
     internalWrite(writer, offset)
   }
 }
