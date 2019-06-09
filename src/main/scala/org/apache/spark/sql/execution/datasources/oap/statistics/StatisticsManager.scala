@@ -54,12 +54,13 @@ class StatisticsWriteManager {
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
-  private var isExternalSorterEnable = false
+  private var _isExternalSorterEnable = false
 
+  def isExternalSorterEnable: Boolean = _isExternalSorterEnable
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
   // which is created from `SparkUtils`, hence containing all spark config values.
   def initialize(indexType: OapIndexType, s: StructType, conf: Configuration): Unit = {
-    isExternalSorterEnable = conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
+    _isExternalSorterEnable = conf.getBoolean(OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.key,
       OapConf.OAP_INDEX_STATISTIC_EXTERNALSORTER_ENABLE.defaultValue.get
     )
 
@@ -81,7 +82,7 @@ class StatisticsWriteManager {
       // stats info does not collect null keys
       return
     }
-    if (!isExternalSorterEnable) {
+    if (!_isExternalSorterEnable) {
       content.append(key)
     }
     stats.foreach(_.addOapKey(key))
@@ -100,7 +101,7 @@ class StatisticsWriteManager {
       offset += 4
     }
 
-    if (isExternalSorterEnable) {
+    if (_isExternalSorterEnable) {
       stats.foreach { stat =>
         val off = stat.customWrite(out)
         assert(off >= 0)
@@ -115,6 +116,16 @@ class StatisticsWriteManager {
       }
     }
     offset
+  }
+
+  def getPartByValueStat: Option[PartByValueStatisticsWriter] = {
+    stats.find(v => v.isInstanceOf[PartByValueStatisticsWriter])
+      .asInstanceOf[Option[PartByValueStatisticsWriter]]
+  }
+
+  def getSampleBasedStat: Option[SampleBasedStatisticsWriter] = {
+    stats.find(v => v.isInstanceOf[SampleBasedStatisticsWriter])
+      .asInstanceOf[Option[SampleBasedStatisticsWriter]]
   }
 
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)

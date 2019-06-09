@@ -243,11 +243,13 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     internalWrite(writer, offset)
   }
 
+  /*
   override def customWrite(writer: OutputStream): Int = {
     val offset = super.customWrite(writer)
-    buildPartMeta2()
+    buildPartMeta3()
     internalWrite(writer, offset)
   }
+  */
 
   // TODO needs refactor, kept for easy debug
   private def buildPartMeta(uniqueKeys: ArrayBuffer[Key], hashMap: java.util.HashMap[Key, Int]) = {
@@ -279,6 +281,7 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     }
   }
 
+  /*
   private def buildPartMeta2() = {
     val sortedIter = externalSorter.iterator
     val size = externalSorter.getDistinctCount
@@ -313,9 +316,88 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
           index = i * perSize
         }
       }
-      metas.append(PartedByValueMeta(partNum, cur, size - 1, count))
+      metas.append(PartedByValueMeta(i, cur, size - 1, count))
     }
   }
+  */
+
+  override def customWrite(writer: OutputStream): Int = {
+    val offset = super.customWrite(writer)
+    internalWrite(writer, offset)
+  }
+
+  private var partCount: Int = _
+  private var partSize: Int = _
+  private var curIdxCount: Int = _
+  private var idxNum: Int = _
+  private var uniqueKeySize: Int = _
+  private var keyCount: Int = _
+  private var curIdx: Int = _
+
+  def initParams(totalKeySize: Int): Unit = {
+    this.uniqueKeySize = totalKeySize
+    if (this.uniqueKeySize > 0) {
+      this.partCount = if (this.uniqueKeySize > maxPartNum) maxPartNum else this.uniqueKeySize
+      this.partSize = this.uniqueKeySize / this.partCount
+      this.curIdxCount = 0
+      this.idxNum = 0
+      this.keyCount = 0
+      this.curIdx = this.idxNum * this.partSize
+    }
+  }
+
+  def buildPartMeta(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
+    var kv: Product2[Key, Seq[Int]] = null
+    if (keyArray != null && keyArray.size != 0) {
+      keyArray.foreach(
+        value => {
+          kv = value
+          this.keyCount += 1
+          this.curIdxCount += kv._2.size
+          if ((this.keyCount - 1) >= this.curIdx) {
+            metas.append(PartedByValueMeta(this.idxNum, kv._1, this.curIdx, this.curIdxCount))
+            this.idxNum += 1
+            this.curIdx = this.idxNum * this.partSize
+          }
+        }
+      )
+
+      if (isLast && ((this.keyCount - 1) > (this.idxNum - 1) * this.partSize)) {
+        metas.append(PartedByValueMeta(this.idxNum, kv._1, this.keyCount - 1, this.curIdxCount))
+      }
+    }
+  }
+
+  /*
+  private def buildPartMeta3() = {
+    val sortedIter = externalSorter.iterator
+    val size = externalSorter.getDistinctCount
+    if (size > 0) {
+      val partNum = if (size > maxPartNum) maxPartNum else size
+      val perSize = size / partNum
+
+      var i = 0
+      var count = 0
+      var index = i * perSize
+      var kv: Product2[Key, Seq[Int]] = null
+      var begin = 0
+
+      while (sortedIter.hasNext) {
+        kv = sortedIter.next()
+        begin += 1
+        count += kv._2.size
+        if ((begin - 1) >= index) {
+          metas.append(PartedByValueMeta(i, kv._1, index, count))
+          i += 1
+          index = i * perSize
+        }
+      }
+      if ((begin - 1) > (i - 1) * perSize) {
+        metas.append(PartedByValueMeta(i, kv._1, size - 1, count))
+      }
+    }
+  } */
+
 }
 
 private[oap] case class PartedByValueMeta(

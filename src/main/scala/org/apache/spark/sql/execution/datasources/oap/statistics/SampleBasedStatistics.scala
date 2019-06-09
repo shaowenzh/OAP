@@ -162,6 +162,7 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
   protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
 
+  /*
   override def customWrite(writer: OutputStream): Int = {
     val offset = super.customWrite(writer)
     val sortedIter = externalSorter.iterator
@@ -172,7 +173,9 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
     logInfo(s"write sampleArray size: ${sampleArray.size}")
     internalWrite(writer, offset, sampleArray.size)
   }
+  */
 
+  /*
   protected def takeSample(
     sortedIter: Iterator[Product2[Key, Seq[Int]]],
     size: Int,
@@ -180,16 +183,72 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
     // use Hashset only when sample size is much smaller than keySize
     if (size == (keySize * sampleRate).toInt) {
       val hashset: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
-      while (hashset.size <= size) {
+      val keyBuffer: mutable.Buffer[Key] = mutable.Buffer.empty[Key]
+      while (hashset.size < size) {
         hashset.add(Random.nextInt((keySize - 1)))
       }
       logInfo(s"use hashset: ${hashset.size}")
-      sortedIter.zipWithIndex.filter(v => hashset.contains(v._2)).map(_._1._1).toArray
+
+      for(value <- sortedIter) {
+        value._2.foreach(
+          idx => {
+            if (hashset.contains(idx)) keyBuffer += value._1
+          }
+        )
+      }
+      keyBuffer.toArray
+
+      // sortedIter.zipWithIndex.filter(v => hashset.contains(v._2)).map(_._1._1).toArray
     } else {
       val dataList = sortedIter.toList
       logInfo(s"use dataList: ${dataList.size}")
       Random.shuffle(dataList.indices.toList)
         .take(size).map(dataList(_)._1).toArray
     }
+  }
+  */
+
+  private var randomIdxArray: Array[Int] = _
+  private var sampleArrayBuffer: ArrayBuffer[Key] = _
+  private var keyCount: Int = 0
+
+  override def customWrite(writer: OutputStream): Int = {
+    val offset = super.customWrite(writer)
+    sampleArray = sampleArrayBuffer.toArray
+    sampleArrayBuffer = null
+    logInfo(s"write sampleArray size: ${sampleArray.size}")
+    internalWrite(writer, offset, sampleArray.size)
+  }
+
+  def initParams(totalSorterRecordSize: Int): Unit = {
+    val size = math.max(
+      (totalSorterRecordSize * sampleRate).toInt, math.min(minSampleSize, totalSorterRecordSize))
+    if (size == (totalSorterRecordSize * sampleRate).toInt) {
+      val hashset: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
+      while (hashset.size < size) {
+        hashset.add(Random.nextInt((totalSorterRecordSize - 1)))
+      }
+      randomIdxArray = hashset.toArray
+      logInfo(s"use randomIdxArray: ${randomIdxArray.size}")
+    } else {
+      randomIdxArray =
+        Random.shuffle((0 to totalSorterRecordSize).indices.toList).take(size).toArray
+    }
+    sampleArrayBuffer = ArrayBuffer.empty[Key]
+  }
+
+  def buildSampleArray(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
+    keyArray.foreach(
+      value => {
+        value._2.foreach(
+          _ => {
+            if (randomIdxArray.contains(keyCount)) {
+              sampleArrayBuffer += value._1
+            }
+            keyCount += 1
+          }
+        )
+      }
+    )
   }
 }

@@ -153,6 +153,20 @@ abstract class BTreeIndexRecordWriter(
       val treeShape = BTreeUtils.generate2(treeSize)
       // Trick here. If root node has no child, then write root node as a child.
       val children = if (treeShape.children.nonEmpty) treeShape.children else treeShape :: Nil
+
+      if (statisticsManager.isExternalSorterEnable) {
+        statisticsManager.getPartByValueStat match {
+          case Some(partByValueStat) =>
+            partByValueStat.initParams(treeSize)
+          case None => _
+        }
+        statisticsManager.getSampleBasedStat match {
+          case Some(sampleBasedStat) =>
+            sampleBasedStat.initParams(recordCount - nullRecordCount)
+          case None => _
+        }
+      }
+
       // Write Node
       children.map { node =>
         val keyCount = sumKeyCount(node) // total number of keys of this node
@@ -164,6 +178,18 @@ abstract class BTreeIndexRecordWriter(
           val bTreeNodeMetaData =
             serializeNode(nodeUniqueKeys, startPosInRowList, tempIdWriter, rowIdListBuffer)
           startPosInRowList += bTreeNodeMetaData.rowCount
+          if (statisticsManager.isExternalSorterEnable) {
+            statisticsManager.getPartByValueStat match {
+              case Some(partByValueStat) =>
+                partByValueStat.buildPartMeta(nodeUniqueKeys, !sortedIter.hasNext)
+              case None => _
+            }
+            statisticsManager.getSampleBasedStat match {
+              case Some(sampleBasedStat) =>
+                sampleBasedStat.buildSampleArray(nodeUniqueKeys, !sortedIter.hasNext)
+              case None => _
+            }
+          }
           bTreeNodeMetaData
         }
       }
