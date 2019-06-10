@@ -23,7 +23,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
@@ -128,7 +127,7 @@ class StatisticsWriteManager {
   private def sortKeys = content.sortWith((l, r) => ordering.compare(l, r) < 0)
 }
 
-object StatisticsManager extends Logging{
+object StatisticsManager {
   val STATISTICSMASK: Long = 0x20170524abcdefabL // a random mask for statistics begin
 
   val statisticsTypeMap: scala.collection.mutable.Map[OapIndexType, Array[String]] =
@@ -164,7 +163,6 @@ object StatisticsManager extends Logging{
       stats: Array[StatisticsReader],
       intervalArray: ArrayBuffer[RangeInterval],
       conf: Configuration): StatsAnalysisResult = {
-    logInfo("start statistic analyse")
     val fullScanThreshold = conf.getDouble(
       OapConf.OAP_FULL_SCAN_THRESHOLD.key, OapConf.OAP_FULL_SCAN_THRESHOLD.defaultValue.get)
     val analysisResults = stats.map(_.analyse(intervalArray))

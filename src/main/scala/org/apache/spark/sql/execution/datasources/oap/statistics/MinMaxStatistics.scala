@@ -23,15 +23,13 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberCache
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.types.StructType
 
-private[oap] class MinMaxStatisticsReader(schema: StructType) extends StatisticsReader(schema)
-  with Logging{
+private[oap] class MinMaxStatisticsReader(schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_MIN_MAX
 
   protected var min: Key = _
@@ -55,7 +53,6 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult = {
     if (min == null || max == null) {
-      logInfo("Use Index")
       return StatsAnalysisResult.USE_INDEX
     }
 
@@ -80,10 +77,8 @@ private[oap] class MinMaxStatisticsReader(schema: StructType) extends Statistics
       }
 
     if (startOutOfBound || endOutOfBound) {
-      logInfo("Skip Index")
       StatsAnalysisResult.SKIP_INDEX
     } else {
-      logInfo("Use Index")
       StatsAnalysisResult.USE_INDEX
     }
   }

@@ -24,7 +24,6 @@ import scala.util.Random
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -34,7 +33,7 @@ import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.types.StructType
 
 private[oap] class SampleBasedStatisticsReader(
-    schema: StructType) extends StatisticsReader(schema) with Logging{
+    schema: StructType) extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_SAMPLE_BASE
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
@@ -42,7 +41,6 @@ private[oap] class SampleBasedStatisticsReader(
   protected var sampleArray: Array[Key] = _
 
   override def read(fiberCache: FiberCache, offset: Int): Int = {
-    logInfo(s"start to read sample")
     var readOffset = super.read(fiberCache, offset) + offset
 
     val size = fiberCache.getInt(readOffset)
@@ -50,21 +48,19 @@ private[oap] class SampleBasedStatisticsReader(
 
     // TODO use unsafe way to interact with sample array
     sampleArray = new Array[Key](size)
-    logInfo(s"read sampleArray size: ${sampleArray.size}")
+
     var rowOffset = 0
     for (i <- 0 until size) {
       sampleArray(i) = nnkr.readKey(
         fiberCache, readOffset + size * IndexUtils.INT_SIZE + rowOffset)._1
       rowOffset = fiberCache.getInt(readOffset + i * IndexUtils.INT_SIZE)
     }
-    logInfo(s"read rowOffset: ${rowOffset}")
     readOffset += (rowOffset + size * IndexUtils.INT_SIZE)
     readOffset - offset
   }
 
   override def analyse(intervalArray: ArrayBuffer[RangeInterval]): StatsAnalysisResult = {
     if (sampleArray == null || sampleArray.isEmpty) {
-      logInfo("Use Index")
       StatsAnalysisResult.USE_INDEX
     } else {
       var hitCnt = 0
@@ -74,14 +70,13 @@ private[oap] class SampleBasedStatisticsReader(
           hitCnt += 1
         }
       }
-      logInfo((hitCnt * 1.0 / sampleArray.length).toString)
       StatsAnalysisResult(hitCnt * 1.0 / sampleArray.length)
     }
   }
 }
 
 private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configuration)
-  extends StatisticsWriter(schema, conf) with Logging{
+  extends StatisticsWriter(schema, conf) {
   override val id: Int = StatisticsType.TYPE_SAMPLE_BASE
 
   lazy val sampleRate: Double = conf.getDouble(
@@ -138,7 +133,6 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
     val offset = super.write2(writer)
     sampleArray = sampleArrayBuffer.toArray
     sampleArrayBuffer = null
-    logInfo(s"write sampleArray size: ${sampleArray.size}")
     internalWrite(writer, offset, sampleArray.size)
   }
 
@@ -149,7 +143,6 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
       while (randomHashSet.size < size) {
         randomHashSet.add(Random.nextInt((totalSorterRecordSize - 1)))
       }
-      logInfo(s"use randomHashSet: ${randomHashSet.size}")
     } else {
       Random.shuffle((0 to totalSorterRecordSize).indices.toList).take(size)
         .foreach(randomHashSet.add(_))
@@ -158,7 +151,6 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
   }
 
   def buildSampleArray(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
-    logInfo("buildSampleArray")
     keyArray.foreach(
       value => {
         value._2.foreach(
@@ -171,6 +163,5 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
         )
       }
     )
-    logInfo(s"use sampleArrayBuffer: ${sampleArrayBuffer.size}")
   }
 }

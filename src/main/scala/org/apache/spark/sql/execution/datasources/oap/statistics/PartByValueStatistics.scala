@@ -23,7 +23,6 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateOrdering
 import org.apache.spark.sql.execution.datasources.oap.Key
@@ -45,7 +44,7 @@ import org.apache.spark.sql.types.StructType
 // (300,  "test#300")   299            300
 
 private[oap] class PartByValueStatisticsReader(schema: StructType)
-  extends StatisticsReader(schema) with Logging{
+  extends StatisticsReader(schema) {
   override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
@@ -121,7 +120,6 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
 
       if (left == -1 || right == 0) {
         // interval.min > partition.max || interval.max < partition.min
-        logInfo("Skip Index")
         StatsAnalysisResult.SKIP_INDEX
       } else {
         var cover: Double =
@@ -137,25 +135,21 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
         }
 
         if (cover > wholeCount) {
-          logInfo("Full Index")
           StatsAnalysisResult.FULL_SCAN
         } else if (cover < 0) {
-          logInfo("Use Index")
           StatsAnalysisResult.USE_INDEX
         } else {
-          logInfo((cover / wholeCount).toString)
           StatsAnalysisResult(cover / wholeCount)
         }
       }
     } else {
-      logInfo("Use Index")
       StatsAnalysisResult.USE_INDEX
     }
   }
 }
 
 private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configuration)
-  extends StatisticsWriter(schema, conf) with Logging{
+  extends StatisticsWriter(schema, conf) {
   override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   private lazy val maxPartNum: Int = conf.getInt(
@@ -268,8 +262,7 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
     }
   }
 
-  def buildPartMeta(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
-    logInfo("buildPartMetax")
+  def buildMetas(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
     var kv: Product2[Key, Seq[Int]] = null
     if (keyArray != null && keyArray.size != 0) {
       keyArray.foreach(
@@ -288,8 +281,6 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
       if (isLast && ((this.keyCount - 1) > (this.idxNum - 1) * this.partSize)) {
         metas.append(PartedByValueMeta(this.idxNum, kv._1, this.keyCount - 1, this.curIdxCount))
       }
-
-      logInfo(s"metas size: ${metas.size}")
     }
   }
 }

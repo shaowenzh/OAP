@@ -181,7 +181,7 @@ abstract class BTreeIndexRecordWriter(
           if (statisticsManager.isExternalSorterEnable) {
             statisticsManager.getPartByValueStat match {
               case Some(partByValueStat) =>
-                partByValueStat.buildPartMeta(nodeUniqueKeys, !sortedIter.hasNext)
+                partByValueStat.buildMetas(nodeUniqueKeys, !sortedIter.hasNext)
               case None =>
             }
             statisticsManager.getSampleBasedStat match {
