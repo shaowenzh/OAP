@@ -88,6 +88,7 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
 
   protected var sampleArray: Array[Key] = _
 
+  // this is the common part used by write and write2
   private def internalWrite(writer: OutputStream, offsetP: Int, sizeP: Int): Int = {
     var offset = offsetP
     val size = sizeP
@@ -126,7 +127,7 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
 
   protected var randomHashSet: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
-  protected var sampleArrayBuffer: ArrayBuffer[Key] = _
+  protected var sampleArrayBuffer: ArrayBuffer[Key] = ArrayBuffer.empty[Key]
   private var keyCount: Int = 0
 
   override def write2(writer: OutputStream): Int = {
@@ -147,7 +148,6 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
       Random.shuffle((0 to totalSorterRecordSize).indices.toList).take(size)
         .foreach(randomHashSet.add(_))
     }
-    sampleArrayBuffer = ArrayBuffer.empty[Key]
   }
 
   def buildSampleArray(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {

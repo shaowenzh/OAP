@@ -329,5 +329,5 @@ object OapConf {
       .internal()
       .doc("To indicate if to enable externalsorter for statistic calculation")
       .booleanConf
-      .createWithDefault(false)
+      .createWithDefault(true)
 }

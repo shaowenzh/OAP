@@ -178,6 +178,9 @@ abstract class BTreeIndexRecordWriter(
           val bTreeNodeMetaData =
             serializeNode(nodeUniqueKeys, startPosInRowList, tempIdWriter, rowIdListBuffer)
           startPosInRowList += bTreeNodeMetaData.rowCount
+          // When enable statistics, partByValueStat and sampleBasedStat
+          // will calculated by using this oapExternalSorter iterator instead of
+          // loading all file data into an extra arraybuffer
           if (statisticsManager.isExternalSorterEnable) {
             statisticsManager.getPartByValueStat match {
               case Some(partByValueStat) =>

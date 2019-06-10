@@ -104,6 +104,7 @@ private[oap] class MinMaxStatisticsWriter(
     }
   }
 
+  // this is the common part used by write and write2
   private def internalWrite(writer: OutputStream, offsetP: Int): Int = {
     var offset = offsetP
     if (min != null) {
