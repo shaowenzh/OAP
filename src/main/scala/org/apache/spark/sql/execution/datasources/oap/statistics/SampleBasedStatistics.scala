@@ -125,8 +125,8 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
   protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
 
-  private var randomHashSet: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
-  private var sampleArrayBuffer: ArrayBuffer[Key] = _
+  protected var randomHashSet: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
+  protected var sampleArrayBuffer: ArrayBuffer[Key] = _
   private var keyCount: Int = 0
 
   override def write2(writer: OutputStream): Int = {
