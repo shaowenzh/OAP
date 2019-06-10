@@ -155,7 +155,7 @@ private[oap] class PartByValueStatisticsReader(schema: StructType)
 }
 
 private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configuration)
-  extends StatisticsWriter(schema, conf) {
+  extends StatisticsWriter(schema, conf) with Logging{
   override val id: Int = StatisticsType.TYPE_PART_BY_VALUE
 
   private lazy val maxPartNum: Int = conf.getInt(
@@ -269,6 +269,7 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
   }
 
   def buildPartMeta(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
+    logInfo("buildPartMetax")
     var kv: Product2[Key, Seq[Int]] = null
     if (keyArray != null && keyArray.size != 0) {
       keyArray.foreach(
@@ -287,6 +288,8 @@ private[oap] class PartByValueStatisticsWriter(schema: StructType, conf: Configu
       if (isLast && ((this.keyCount - 1) > (this.idxNum - 1) * this.partSize)) {
         metas.append(PartedByValueMeta(this.idxNum, kv._1, this.keyCount - 1, this.curIdxCount))
       }
+
+      logInfo(s"metas size: ${metas.size}")
     }
   }
 }

@@ -158,12 +158,12 @@ abstract class BTreeIndexRecordWriter(
         statisticsManager.getPartByValueStat match {
           case Some(partByValueStat) =>
             partByValueStat.initParams(treeSize)
-          case None => _
+          case None =>
         }
         statisticsManager.getSampleBasedStat match {
           case Some(sampleBasedStat) =>
             sampleBasedStat.initParams(recordCount - nullRecordCount)
-          case None => _
+          case None =>
         }
       }
 
@@ -182,12 +182,12 @@ abstract class BTreeIndexRecordWriter(
             statisticsManager.getPartByValueStat match {
               case Some(partByValueStat) =>
                 partByValueStat.buildPartMeta(nodeUniqueKeys, !sortedIter.hasNext)
-              case None => _
+              case None =>
             }
             statisticsManager.getSampleBasedStat match {
               case Some(sampleBasedStat) =>
                 sampleBasedStat.buildSampleArray(nodeUniqueKeys, !sortedIter.hasNext)
-              case None => _
+              case None =>
             }
           }
           bTreeNodeMetaData

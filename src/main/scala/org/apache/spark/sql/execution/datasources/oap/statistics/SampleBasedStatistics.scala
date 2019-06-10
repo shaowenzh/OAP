@@ -130,7 +130,7 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
   protected def takeSample(keys: ArrayBuffer[InternalRow], size: Int): Array[InternalRow] =
     Random.shuffle(keys.indices.toList).take(size).map(keys(_)).toArray
 
-  private var randomIdxArray: Array[Int] = _
+  private var randomHashSet: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
   private var sampleArrayBuffer: ArrayBuffer[Key] = _
   private var keyCount: Int = 0
 
@@ -146,25 +146,24 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
     val size = math.max(
       (totalSorterRecordSize * sampleRate).toInt, math.min(minSampleSize, totalSorterRecordSize))
     if (size == (totalSorterRecordSize * sampleRate).toInt) {
-      val hashset: mutable.HashSet[Int] = mutable.HashSet.empty[Int]
-      while (hashset.size < size) {
-        hashset.add(Random.nextInt((totalSorterRecordSize - 1)))
+      while (randomHashSet.size < size) {
+        randomHashSet.add(Random.nextInt((totalSorterRecordSize - 1)))
       }
-      randomIdxArray = hashset.toArray
-      logInfo(s"use randomIdxArray: ${randomIdxArray.size}")
+      logInfo(s"use randomHashSet: ${randomHashSet.size}")
     } else {
-      randomIdxArray =
-        Random.shuffle((0 to totalSorterRecordSize).indices.toList).take(size).toArray
+      Random.shuffle((0 to totalSorterRecordSize).indices.toList).take(size)
+        .foreach(randomHashSet.add(_))
     }
     sampleArrayBuffer = ArrayBuffer.empty[Key]
   }
 
   def buildSampleArray(keyArray: Array[Product2[Key, Seq[Int]]], isLast: Boolean): Unit = {
+    logInfo("buildSampleArray")
     keyArray.foreach(
       value => {
         value._2.foreach(
           _ => {
-            if (randomIdxArray.contains(keyCount)) {
+            if (randomHashSet.contains(keyCount)) {
               sampleArrayBuffer += value._1
             }
             keyCount += 1
@@ -172,5 +171,6 @@ private[oap] class SampleBasedStatisticsWriter(schema: StructType, conf: Configu
         )
       }
     )
+    logInfo(s"use sampleArrayBuffer: ${sampleArrayBuffer.size}")
   }
 }
