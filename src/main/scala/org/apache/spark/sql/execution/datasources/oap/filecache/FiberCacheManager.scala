@@ -152,6 +152,13 @@ private[sql] class FiberCacheManager(
     }
   }
 
+  // Only used by test suite
+  private[filecache] def enableGuavaCacheSeparation(): Unit = {
+    if (cacheBackend.isInstanceOf[GuavaOapCache]) {
+      cacheBackend.asInstanceOf[GuavaOapCache].enableCacheSeparation()
+    }
+  }
+
   // Used by test suite
   private[oap] def clearAllFibers(): Unit = cacheBackend.cleanUp
 

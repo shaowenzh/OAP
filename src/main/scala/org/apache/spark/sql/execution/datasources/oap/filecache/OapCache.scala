@@ -121,7 +121,7 @@ class GuavaOapCache(
     dataCacheMemory: Long,
     indexCacheMemory: Long,
     cacheGuardianMemory: Long,
-    indexDataSeparationEnable: Boolean)
+    var indexDataSeparationEnable: Boolean)
     extends OapCache with Logging {
 
   // TODO: CacheGuardian can also track cache statistics periodically
@@ -153,63 +153,47 @@ class GuavaOapCache(
     }
   }
 
-  private val dataCacheInstance = CacheBuilder.newBuilder()
-    .recordStats()
-    .removalListener(removalListener)
-    .maximumWeight(DATA_MAX_WEIGHT)
-    .weigher(weigher)
-    .concurrencyLevel(CONCURRENCY_LEVEL)
-    .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
-    override def load(key: FiberId): FiberCache = {
-      val startLoadingTime = System.currentTimeMillis()
-      val fiberCache = cache(key)
-      incFiberCountAndSize(key, 1, fiberCache.size())
-      logDebug(
-        "Load missed data fiber took %s. Fiber: %s. length: %s".format(
-          Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
-      _cacheSize.addAndGet(fiberCache.size())
-      fiberCache
-    }
-  })
+  // this is only used when enable index and data cache separation
+  private var dataCacheInstance = if (indexDataSeparationEnable) {
+    initLoadingCache(DATA_MAX_WEIGHT)
+  } else {
+    null
+  }
 
-  private val indexCacheInstance = CacheBuilder.newBuilder()
-    .recordStats()
-    .removalListener(removalListener)
-    .maximumWeight(INDEX_MAX_WEIGHT)
-    .weigher(weigher)
-    .concurrencyLevel(CONCURRENCY_LEVEL)
-    .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
-    override def load(key: FiberId): FiberCache = {
-      val startLoadingTime = System.currentTimeMillis()
-      val fiberCache = cache(key)
-      incFiberCountAndSize(key, 1, fiberCache.size())
-      logDebug(
-        "Load missed index fiber took %s. Fiber: %s. length: %s".format(
-          Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
-      _cacheSize.addAndGet(fiberCache.size())
-      fiberCache
-    }
-  })
+  // this is only used when enable index and data cache separation
+  private var indexCacheInstance = if (indexDataSeparationEnable) {
+    initLoadingCache(INDEX_MAX_WEIGHT)
+  } else {
+    null
+  }
 
   // this is only used when disable index and data cache separation
-  private val generalCacheInstance = CacheBuilder.newBuilder()
-    .recordStats()
-    .removalListener(removalListener)
-    .maximumWeight(TOTAL_MAX_WEIGHT)
-    .weigher(weigher)
-    .concurrencyLevel(CONCURRENCY_LEVEL)
-    .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
-    override def load(key: FiberId): FiberCache = {
-      val startLoadingTime = System.currentTimeMillis()
-      val fiberCache = cache(key)
-      incFiberCountAndSize(key, 1, fiberCache.size())
-      logDebug(
-        "Load missed index fiber took %s. Fiber: %s. length: %s".format(
-          Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
-      _cacheSize.addAndGet(fiberCache.size())
-      fiberCache
-    }
-  })
+  private var generalCacheInstance = if (!indexDataSeparationEnable) {
+    initLoadingCache(TOTAL_MAX_WEIGHT)
+  } else {
+    null
+  }
+
+  private def initLoadingCache(weight: Int) = {
+    CacheBuilder.newBuilder()
+      .recordStats()
+      .removalListener(removalListener)
+      .maximumWeight(weight)
+      .weigher(weigher)
+      .concurrencyLevel(CONCURRENCY_LEVEL)
+      .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
+      override def load(key: FiberId): FiberCache = {
+        val startLoadingTime = System.currentTimeMillis()
+        val fiberCache = cache(key)
+        incFiberCountAndSize(key, 1, fiberCache.size())
+        logDebug(
+          "Load missed index fiber took %s. Fiber: %s. length: %s".format(
+            Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
+        _cacheSize.addAndGet(fiberCache.size())
+        fiberCache
+      }
+    })
+  }
 
   override def get(fiber: FiberId): FiberCache = {
     val readLock = OapRuntime.getOrCreate.fiberLockManager.getFiberLock(fiber).readLock()
@@ -355,5 +339,17 @@ class GuavaOapCache(
     } else {
       generalCacheInstance.cleanUp()
     }
+  }
+
+  // This is only for test purpose
+  private[filecache] def enableCacheSeparation(): Unit = {
+    this.indexDataSeparationEnable = true
+    if (dataCacheInstance == null) {
+      dataCacheInstance = initLoadingCache(DATA_MAX_WEIGHT)
+    }
+    if (indexCacheInstance == null) {
+      indexCacheInstance = initLoadingCache(INDEX_MAX_WEIGHT)
+    }
+    generalCacheInstance = null
   }
 }
