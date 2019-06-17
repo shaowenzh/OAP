@@ -50,7 +50,7 @@ class StatisticsWriteManager {
 
   @transient private lazy val ordering = GenerateOrdering.create(schema)
 
-  private var _isExternalSorterEnable = false
+  private var _isExternalSorterEnable = true
 
   def isExternalSorterEnable: Boolean = _isExternalSorterEnable
   // When a task initialize statisticsWriteManager, we read all config from `conf`,
