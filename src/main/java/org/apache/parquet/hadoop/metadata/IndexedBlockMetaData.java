@@ -24,10 +24,12 @@ import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 public class IndexedBlockMetaData extends OrderedBlockMetaData {
 
   private IntList needRowIds;
+  private int rowStartNum;
 
-  public IndexedBlockMetaData(OrderedBlockMetaData orderedBlockMetaData, IntList needRowIds) {
+  public IndexedBlockMetaData(OrderedBlockMetaData orderedBlockMetaData, IntList needRowIds, int rowStartNum) {
     super(orderedBlockMetaData.rowGroupId, orderedBlockMetaData.meta);
     this.needRowIds = needRowIds;
+    this.rowStartNum = rowStartNum;
   }
 
   public IntList getNeedRowIds() {

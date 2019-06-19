@@ -49,6 +49,8 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
   private static final String IDS_ITER_STATE_ERROR_MSG =
     "The divideRowIdsIntoPages method should not be called when currentIndexList is Empty.";
 
+  private boolean enablePageFilter = false;
+
   public IndexedVectorizedOapRecordReader(
       Path file,
       Configuration configuration,
@@ -78,6 +80,10 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     // use indexedFooter read data, need't do filterRowGroups.
     initialize(footer.toParquetMetadata(globalRowIds), configuration, false);
     super.initializeInternal();
+  }
+
+  public void enablePageFilter() {
+    this.enablePageFilter = true;
   }
 
   @Override

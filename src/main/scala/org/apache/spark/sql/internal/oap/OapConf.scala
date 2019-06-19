@@ -323,6 +323,13 @@ object OapConf {
       .booleanConf
       .createWithDefault(true)
 
+  val OAP_PARQUET_INDEX_PAGE_FILTER_ENABLE =
+    SqlConfAdapter.buildConf("spark.sql.oap.parquet.index.page.filter.enable")
+      .internal()
+      .doc("To indicate if enable parquet index, default true")
+      .booleanConf
+      .createWithDefault(true)
+
   val OAP_INDEX_DIRECTORY =
     SqlConfAdapter.buildConf("spark.sql.oap.index.directory")
       .internal()

@@ -76,6 +76,10 @@ private[oap] case class ParquetDataFile(
     configuration.getBoolean(OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.key,
       OapConf.OAP_PARQUET_DATA_CACHE_ENABLED.defaultValue.get)
 
+  val parquetDataCachePageFilterEnable =
+    configuration.getBoolean(OapConf.OAP_PARQUET_INDEX_PAGE_FILTER_ENABLE.key,
+      OapConf.OAP_PARQUET_INDEX_PAGE_FILTER_ENABLE.defaultValue.get)
+
   private var fiberDataReader: ParquetFiberDataReader = _
 
   private val inUseFiberCache = new Array[FiberCache](schema.length)
@@ -151,9 +155,14 @@ private[oap] case class ParquetDataFile(
                 meta.footer.toParquetMetadata(rowIds), this, requiredIds))
           } else {
             addRequestSchemaToConf(configuration, requiredIds)
-            initVectorizedReader(c,
-              new IndexedVectorizedOapRecordReader(file,
-                configuration, meta.footer, rowIds))
+            val indexReader = new IndexedVectorizedOapRecordReader(file,
+              configuration, meta.footer, rowIds)
+
+            if (parquetDataCachePageFilterEnable) {
+              indexReader.enablePageFilter()
+            }
+
+            initVectorizedReader(c, indexReader)
           }
         case _ =>
           addRequestSchemaToConf(configuration, requiredIds)
