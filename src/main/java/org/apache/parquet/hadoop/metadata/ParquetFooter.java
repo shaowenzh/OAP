@@ -83,7 +83,7 @@ public class ParquetFooter {
         }
       }
       if (!rowIdList.isEmpty()) {
-        validBlocks.add(new IndexedBlockMetaData(block, rowIdList, currentRowGroupStartRowId));
+        validBlocks.add(new IndexedBlockMetaData(block, rowIdList));
       }
     }
     return new ParquetMetadata(fileMetaData, validBlocks);

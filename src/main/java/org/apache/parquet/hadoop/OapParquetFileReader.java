@@ -36,10 +36,10 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FI
 
 public class OapParquetFileReader implements Closeable {
 
-  private ParquetFileReader reader;
-  private int currentBlock = 0;
+  protected ParquetFileReader reader;
+  protected int currentBlock = 0;
 
-  private OapParquetFileReader(ParquetFileReader reader) {
+  protected OapParquetFileReader(ParquetFileReader reader) {
     this.reader = reader;
   }
 

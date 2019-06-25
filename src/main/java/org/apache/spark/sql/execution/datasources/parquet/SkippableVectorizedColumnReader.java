@@ -46,13 +46,13 @@ public class SkippableVectorizedColumnReader extends VectorizedColumnReader {
    * Reference dataColumn, but Type is SkippableVectorizedValuesReader, reduce manual cast
    * times.
    */
-  private SkippableVectorizedValuesReader dataColumnRef;
+  protected SkippableVectorizedValuesReader dataColumnRef;
 
   /**
    * Reference defColumn, but Type is SkippableVectorizedRleValuesReader, reduce manual cast
    * times.
    */
-  private SkippableVectorizedRleValuesReader defColumnRef;
+  protected SkippableVectorizedRleValuesReader defColumnRef;
 
   public SkippableVectorizedColumnReader(
       ColumnDescriptor descriptor,

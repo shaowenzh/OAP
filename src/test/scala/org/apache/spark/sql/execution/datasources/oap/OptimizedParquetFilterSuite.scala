@@ -167,8 +167,8 @@ class OptimizedParquetFilterSuite extends QueryTest with SharedOapContext with B
         sql("create oindex indexA on partitioned_parquet (a) partition(c = 0)")
         sql("create oindex indexA on partitioned_parquet (a) partition(c = 1)")
         val beforeQuery = OapRuntime.getOrCreate.fiberCacheManager.cacheStats.indexFiberCount
-        val df = sql("SELECT b FROM partitioned_parquet WHERE a = 1 or a = 2")
-        checkAnswer(df, Row("this is test 1") :: Row("this is test 2") :: Nil)
+        val df = sql("SELECT b FROM partitioned_parquet WHERE a = 5 or a = 7")
+        checkAnswer(df, Row("this is test 5") :: Row("this is test 7") :: Nil)
         // After `INSERT TABLE` there are 4 files, there are 4 footer fiber need load,
         // 2 files need load node pos fiber and rowIdList fiber, so after query increment is 8.
         // If `OAP_INDEXER_USE_CONSTANT_TIMESTAMPS_ENABLED` if false, the indexFiberCount only 4

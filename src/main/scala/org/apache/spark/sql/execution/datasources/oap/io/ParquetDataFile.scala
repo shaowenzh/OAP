@@ -155,14 +155,15 @@ private[oap] case class ParquetDataFile(
                 meta.footer.toParquetMetadata(rowIds), this, requiredIds))
           } else {
             addRequestSchemaToConf(configuration, requiredIds)
-            val indexReader = new IndexedVectorizedOapRecordReader(file,
-              configuration, meta.footer, rowIds)
-
             if (parquetDataCachePageFilterEnable) {
-              indexReader.enablePageFilter()
+              initVectorizedReader(c,
+                new IndexedVectorizedOapRecordReaderV2(file,
+                  configuration, meta.footer, rowIds))
+            } else {
+              initVectorizedReader(c,
+                new IndexedVectorizedOapRecordReader(file,
+                  configuration, meta.footer, rowIds))
             }
-
-            initVectorizedReader(c, indexReader)
           }
         case _ =>
           addRequestSchemaToConf(configuration, requiredIds)

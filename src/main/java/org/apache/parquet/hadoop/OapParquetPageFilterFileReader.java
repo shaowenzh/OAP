@@ -16,105 +16,24 @@
  */
 package org.apache.parquet.hadoop;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.column.page.PageReadStore;
-import org.apache.parquet.filter2.compat.FilterCompat;
-import org.apache.parquet.format.converter.ParquetMetadataConverter;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
-import org.apache.parquet.hadoop.metadata.IndexedBlockMetaData;
-import org.apache.parquet.hadoop.metadata.ParquetFooter;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
-import org.apache.parquet.schema.MessageType;
-
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
 
-import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
-public class OapParquetPageFilterFileReader implements Closeable {
+public class OapParquetPageFilterFileReader extends OapParquetFileReader implements Closeable {
 
-  private ParquetFileReader reader;
-  private int currentBlock = 0;
-
-  private OapParquetPageFilterFileReader(ParquetFileReader reader) {
-    this.reader = reader;
+  private OapParquetPageFilterFileReader(ParquetPageFilterFileReader reader) {
+    super(reader);
   }
 
-  public static OapParquetPageFilterFileReader open(Configuration conf, Path file, ParquetMetadata footer)
+  public static OapParquetPageFilterFileReader open(
+    Configuration conf,
+    Path file,
+    ParquetMetadata footer)
           throws IOException {
-    return new OapParquetPageFilterFileReader(new ParquetFileReader(conf, file, footer));
-  }
-
-  public RowGroupDataAndRowIds readNextRowGroupAndRowIds() throws IOException {
-    PageReadStore pageReadStore = reader.readNextRowGroup();
-    BlockMetaData blockMetaData = reader.getRowGroups().get(currentBlock);
-    currentBlock ++;
-    IntList needRowIds = ((IndexedBlockMetaData) blockMetaData).getNeedRowIds();
-    return new RowGroupDataAndRowIds(pageReadStore, needRowIds);
-  }
-
-  public PageReadStore readNextRowGroup() throws IOException {
-    PageReadStore pageReadStore = this.reader.readNextRowGroup();
-    currentBlock ++;
-    return pageReadStore;
-  }
-
-  public void filterRowGroups(FilterCompat.Filter filter) throws IOException {
-    this.reader.filterRowGroups(filter);
-  }
-
-  public void setRequestedSchema(MessageType projection) {
-    this.reader.setRequestedSchema(projection);
-  }
-
-  public List<BlockMetaData> getRowGroups() {
-    return this.reader.getRowGroups();
-  }
-
-  @Override
-  public void close() throws IOException {
-    this.reader.close();
-  }
-
-  public ParquetMetadata getFooter() {
-    return this.reader.getFooter();
-  }
-
-  public Path getPath() {
-    return this.reader.getPath();
-  }
-
-  public static ParquetFooter readParquetFooter(
-      Configuration configuration,
-      Path file) throws IOException {
-    return readParquetFooter(configuration, file, NO_FILTER);
-  }
-
-  public static ParquetFooter readParquetFooter(
-      Configuration configuration,
-      Path file,
-      ParquetMetadataConverter.MetadataFilter filter) throws IOException {
-    return ParquetFooter.from(ParquetFileReader.readFooter(configuration, file, filter));
-  }
-
-  public static class RowGroupDataAndRowIds {
-    private PageReadStore pageReadStore;
-    private IntList rowIds;
-
-    RowGroupDataAndRowIds(PageReadStore pageReadStore, IntList rowIds) {
-      this.pageReadStore = pageReadStore;
-      this.rowIds = rowIds;
-    }
-
-    public PageReadStore getPageReadStore() {
-      return pageReadStore;
-    }
-
-    public IntList getRowIds() {
-      return rowIds;
-    }
+    return new OapParquetPageFilterFileReader(new ParquetPageFilterFileReader(conf, file, footer));
   }
 }

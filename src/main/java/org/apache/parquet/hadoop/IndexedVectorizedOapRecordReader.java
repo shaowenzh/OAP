@@ -39,7 +39,7 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
   // Record current PageNumber
   private int currentPageNumber;
   // Rowid list of file granularity
-  private int[] globalRowIds;
+  protected int[] globalRowIds;
   // for returnColumnarBatch is false branch,
   // secondary indexes to call columnarBatch.getRow
   private IntList batchIds;
@@ -48,8 +48,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     "The divideRowIdsIntoPages method should not be called when idsMap is not empty.";
   private static final String IDS_ITER_STATE_ERROR_MSG =
     "The divideRowIdsIntoPages method should not be called when currentIndexList is Empty.";
-
-  private boolean enablePageFilter = false;
 
   public IndexedVectorizedOapRecordReader(
       Path file,
@@ -80,10 +78,6 @@ public class IndexedVectorizedOapRecordReader extends VectorizedOapRecordReader 
     // use indexedFooter read data, need't do filterRowGroups.
     initialize(footer.toParquetMetadata(globalRowIds), configuration, false);
     super.initializeInternal();
-  }
-
-  public void enablePageFilter() {
-    this.enablePageFilter = true;
   }
 
   @Override

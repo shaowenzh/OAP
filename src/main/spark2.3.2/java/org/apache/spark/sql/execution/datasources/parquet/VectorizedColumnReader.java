@@ -92,7 +92,7 @@ public class VectorizedColumnReader {
    */
   protected int pageValueCount;
 
-  private final PageReader pageReader;
+  protected final PageReader pageReader;
   protected final ColumnDescriptor descriptor;
   protected final OriginalType originalType;
   // The timezone conversion to apply to int96 timestamps. Null if no conversion.
@@ -248,7 +248,7 @@ public class VectorizedColumnReader {
   /**
    * Reads `num` values into column, decoding the values from `dictionaryIds` and `dictionary`.
    */
-  private void decodeDictionaryIds(
+  protected void decodeDictionaryIds(
       int rowId,
       int num,
       WritableColumnVector column,
@@ -388,7 +388,7 @@ public class VectorizedColumnReader {
    * is guaranteed that num is smaller than the number of values left in the current page.
    */
 
-  private void readBooleanBatch(int rowId, int num, WritableColumnVector column) {
+  protected void readBooleanBatch(int rowId, int num, WritableColumnVector column) {
     if (column.dataType() != DataTypes.BooleanType) {
       throw constructConvertNotSupportedException(descriptor, column);
     }
@@ -396,7 +396,7 @@ public class VectorizedColumnReader {
         num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
   }
 
-  private void readIntBatch(int rowId, int num, WritableColumnVector column) {
+  protected void readIntBatch(int rowId, int num, WritableColumnVector column) {
     // This is where we implement support for the valid type conversions.
     // TODO: implement remaining type conversions
     if (column.dataType() == DataTypes.IntegerType || column.dataType() == DataTypes.DateType ||
@@ -414,7 +414,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readLongBatch(int rowId, int num, WritableColumnVector column) {
+  protected void readLongBatch(int rowId, int num, WritableColumnVector column) {
     // This is where we implement support for the valid type conversions.
     if (column.dataType() == DataTypes.LongType ||
         DecimalType.is64BitDecimalType(column.dataType()) ||
@@ -434,7 +434,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readFloatBatch(int rowId, int num, WritableColumnVector column) {
+  protected void readFloatBatch(int rowId, int num, WritableColumnVector column) {
     // This is where we implement support for the valid type conversions.
     // TODO: support implicit cast to double?
     if (column.dataType() == DataTypes.FloatType) {
@@ -445,7 +445,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readDoubleBatch(int rowId, int num, WritableColumnVector column) {
+  protected void readDoubleBatch(int rowId, int num, WritableColumnVector column) {
     // This is where we implement support for the valid type conversions.
     // TODO: implement remaining type conversions
     if (column.dataType() == DataTypes.DoubleType) {
@@ -456,7 +456,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readBinaryBatch(int rowId, int num, WritableColumnVector column) {
+  protected void readBinaryBatch(int rowId, int num, WritableColumnVector column) {
     // This is where we implement support for the valid type conversions.
     // TODO: implement remaining type conversions
     VectorizedValuesReader data = (VectorizedValuesReader) dataColumn;
@@ -491,7 +491,7 @@ public class VectorizedColumnReader {
     }
   }
 
-  private void readFixedLenByteArrayBatch(
+  protected void readFixedLenByteArrayBatch(
       int rowId,
       int num,
       WritableColumnVector column,
