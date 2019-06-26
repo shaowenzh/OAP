@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.expressions.{SortDirection, UnsafeRow}
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.io.OapIndexInfo
 import org.apache.spark.sql.execution.datasources.oap.statistics.StatsAnalysisResult
+import org.apache.spark.sql.execution.datasources.oap.utils.MericsRecord
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
@@ -334,7 +335,9 @@ private[oap] class IndexScanners(val scanners: Seq[IndexScanner])
 
   // Either it directs us to skip this file(SKIP_INDEX) or use index(USE_INDEX)
   def isIndexFileBeneficial(dataPath: Path, conf: Configuration): Boolean = {
+    val indexCheckTime = System.nanoTime()
     val analysisResults = scanners.map(s => (s, s.analysisResByPolicies(dataPath, conf)))
+    MericsRecord.TimeAddOrIncrement("/indexCheckTime/test", indexCheckTime, "index Check Time")
     if (analysisResults.forall(_._2 == StatsAnalysisResult.FULL_SCAN)) {
       false
     } else {

@@ -37,7 +37,11 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.spark.sql.execution.datasources.oap.utils.MericsRecord$;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.SequenceInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -215,7 +219,7 @@ public class ParquetPageFilterFileReader extends ParquetFileReader {
       List<OapChunk> result = new ArrayList<OapChunk>(chunks.size());
 
       f.seek(tempOffset);
-
+      long startTime = System.nanoTime();
       for (int i = 0; i < chunks.size(); i++) {
         ChunkDescriptor descriptor = chunks.get(i);
         PrimitiveType type = getFileMetaData().getSchema()
@@ -223,21 +227,38 @@ public class ParquetPageFilterFileReader extends ParquetFileReader {
         OapChunk chunk = new OapChunk(descriptor);
         int currentChunkRowOffset = 0;
 
-
-        int pageNum = 0;
-
         while (currentChunkRowOffset < descriptor.metadata.getValueCount()) {
+          long headerTime = System.nanoTime();
+          long foffset = f.getPos();
+          byte[] headerBytes = new byte[100];
+          f.readFully(headerBytes);
+          MericsRecord$.MODULE$.TimeAddOrIncrement("/pageheaderread/test", headerTime, "page header read time");
+          long headerDecodeTime = System.nanoTime();
+          ByteArrayInputStream headerStream = new ByteArrayInputStream(headerBytes);
+          MericsRecord$.MODULE$.TimeAddOrIncrement("/pageheaderdecode/test", headerDecodeTime, "page header decode time");
+          PageHeader pageHeader = Util.readPageHeader(headerStream);
+          foffset = f.getPos();
+          MericsRecord$.MODULE$.TimeAddOrIncrement("/pageheader/test", headerTime, "page header time");
+          /*
+          long headerTime = System.nanoTime();
           PageHeader pageHeader = Util.readPageHeader(f);
+          MericsRecord$.MODULE$.TimeAddOrIncrement("/pageheader/test", headerTime, "page header time");
           tempOffset = f.getPos();
+          */
+          tempOffset = f.getPos() - headerStream.available();
+
+          long pageTime = System.nanoTime();
           int uncompressedPageSize = pageHeader.getUncompressed_page_size();
           int compressedPageSize = pageHeader.getCompressed_page_size();
           if (pageHeader.type == DICTIONARY_PAGE) {
             DictionaryPageHeader dicHeader = pageHeader.getDictionary_page_header();
-            byte[] pageBytes = new byte[compressedPageSize];
+            byte[] headerLeft = new byte[headerStream.available()];
+            byte[] pageBytes = new byte[compressedPageSize - headerStream.available()];
+            headerStream.read(headerLeft);
             f.readFully(pageBytes);
             chunk.setDictionaryPage(
               new DictionaryPage(
-                BytesInput.from(pageBytes),
+                BytesInput.concat(BytesInput.from(headerLeft), BytesInput.from(pageBytes)),
                 uncompressedPageSize,
                 dicHeader.getNum_values(),
                 converter.getEncoding(dicHeader.getEncoding())
@@ -245,7 +266,6 @@ public class ParquetPageFilterFileReader extends ParquetFileReader {
             );
             tempOffset += compressedPageSize;
           } else if (pageHeader.type ==  DATA_PAGE) {
-            pageNum++;
             DataPageHeader dataHeaderV1 = pageHeader.getData_page_header();
             pageValue = dataHeaderV1.getNum_values();
 
@@ -272,11 +292,13 @@ public class ParquetPageFilterFileReader extends ParquetFileReader {
             if (isSkip) {
               f.seek(tempOffset);
             } else {
-              byte[] pageBytes = new byte[compressedPageSize];
+              byte[] headerLeft = new byte[headerStream.available()];
+              byte[] pageBytes = new byte[compressedPageSize - headerStream.available()];
+              headerStream.read(headerLeft);
               f.readFully(pageBytes);
               chunk.readInSinglePage(
                 new OapParquetDataPageV1(
-                  BytesInput.from(pageBytes),
+                  BytesInput.concat(BytesInput.from(headerLeft), BytesInput.from(pageBytes)),
                   dataHeaderV1.getNum_values(),
                   uncompressedPageSize,
                   converter.fromParquetStatistics(
@@ -320,6 +342,7 @@ public class ParquetPageFilterFileReader extends ParquetFileReader {
               int dataSize = compressedPageSize - dataHeaderV2.getRepetition_levels_byte_length() - dataHeaderV2.getDefinition_levels_byte_length();
               int offset = 0;
               byte[] pageBytes = new byte[compressedPageSize];
+              f.seek(tempOffset);
               f.readFully(pageBytes);
               BytesInput rlBytes = BytesInput.from(pageBytes, offset, dataHeaderV2.getRepetition_levels_byte_length());
               offset += dataHeaderV2.getRepetition_levels_byte_length();
@@ -350,11 +373,11 @@ public class ParquetPageFilterFileReader extends ParquetFileReader {
             tempOffset += compressedPageSize;
             f.seek(tempOffset);
           }
+          MericsRecord$.MODULE$.TimeAddOrIncrement("/pageDataTime/test", pageTime, "page data time");
         }
-        // LOG.info("total pages In Chunk: " + pageNum);
         result.add(chunk);
       }
-
+      MericsRecord$.MODULE$.TimeAddOrIncrement("/headerandpagetotal/test", startTime, "headerandpage time");
       return result;
     }
 

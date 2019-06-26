@@ -19,6 +19,7 @@ import org.apache.parquet.schema.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.spark.sql.execution.datasources.oap.utils.MericsRecord$;
 import org.apache.spark.sql.execution.datasources.parquet.ParquetReadSupportWrapper;
 import org.apache.spark.sql.execution.datasources.parquet.SkippableVectorizedColumnReaderV2;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
@@ -71,8 +72,18 @@ public class IndexedVectorizedOapRecordReaderV2 extends IndexedVectorizedOapReco
     if (rowsReturned >= totalRowCount) {
       return false;
     }
+    long checkEndOfRowGroupStartTime = System.nanoTime();
     checkEndOfRowGroup();
+    MericsRecord$.MODULE$.TimeAddOrIncrement(
+      "/checkEndOfRowGroup/test",
+      checkEndOfRowGroupStartTime,
+      "checkEndOfRowGroup time");
+    long nextBatchStartTime = System.nanoTime();
     nextBatchBasedOnNeedRow();
+    MericsRecord$.MODULE$.TimeAddOrIncrement(
+      "/nextBatch/test",
+      nextBatchStartTime,
+      "next batch time");
     return true;
   }
 
@@ -165,9 +176,11 @@ public class IndexedVectorizedOapRecordReaderV2 extends IndexedVectorizedOapReco
   }
 
   private TreeMap<Integer, Integer> rowIdsToFetchList() {
+    /*
     LOG.info("first row: " +
       currentRowNeedList.get(0) +
       "last row: " + currentRowNeedList.get(currentRowNeedList.size() - 1));
+      */
     // value in RowNeedList should be all different and ascending
     TreeMap<Integer, Integer> rowFetchHashSet = new TreeMap<Integer, Integer>();
     if (currentRowNeedList.size() == 0) {

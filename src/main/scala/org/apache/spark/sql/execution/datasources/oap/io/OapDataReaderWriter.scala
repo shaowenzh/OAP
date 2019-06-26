@@ -33,7 +33,7 @@ import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.execution.datasources.oap._
 import org.apache.spark.sql.execution.datasources.oap.filecache.DataFiberBuilder
 import org.apache.spark.sql.execution.datasources.oap.index._
-import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, OapIndexInfoStatusSerDe}
+import org.apache.spark.sql.execution.datasources.oap.utils.{FilterHelper, MericsRecord, OapIndexInfoStatusSerDe}
 import org.apache.spark.sql.execution.datasources.orc.OrcDeserializer
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.listener.SparkListenerOapIndexInfoUpdate
@@ -299,11 +299,13 @@ private[oap] class OapDataReaderV1(
           }
         }
 
-
+        val indexStartTime = System.nanoTime()
         val start = if (log.isDebugEnabled) System.currentTimeMillis else 0
         val rows = getRowIds(options)
         val iter = fileScanner.iteratorWithRowIds(requiredIds, rows, filters)
         val end = if (log.isDebugEnabled) System.currentTimeMillis else 0
+        MericsRecord.TimeAddOrIncrement(
+          "/indexSearchTime/test", indexStartTime, "index Search Time")
 
         _indexStat = HIT_INDEX
         _rowsReadWhenHitIndex = Some(rows.length)

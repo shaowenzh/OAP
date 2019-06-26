@@ -31,8 +31,9 @@ import org.apache.parquet.hadoop.metadata.ParquetFooter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.it.unimi.dsi.fastutil.ints.IntList;
 import org.apache.parquet.schema.MessageType;
-
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER;
+
+import org.apache.spark.sql.execution.datasources.oap.utils.MericsRecord$;
 
 public class OapParquetFileReader implements Closeable {
 
@@ -77,6 +78,7 @@ public class OapParquetFileReader implements Closeable {
   @Override
   public void close() throws IOException {
     this.reader.close();
+    MericsRecord$.MODULE$.PrintLog();
   }
 
   public ParquetMetadata getFooter() {
