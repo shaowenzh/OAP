@@ -46,6 +46,6 @@ private[spark] object OapMessages {
   case class FiberCacheMetricsHeartbeat(
       executorId: String, blockManagerId: BlockManagerId, content: String) extends Heartbeat
 
-  case class AskExecutorIdNumPerHost(executorId: String) extends OapMessage
+  case class AskExecutorIdNumPerHost(executorId: String, host: String) extends OapMessage
   case class ReplyExecutorIdNumPerHost(executorId: String, num: Int) extends OapMessage
 }

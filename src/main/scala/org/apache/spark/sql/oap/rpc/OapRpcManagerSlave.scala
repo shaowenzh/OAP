@@ -55,7 +55,8 @@ private[spark] class OapRpcManagerSlave(
   startOapHeartbeater()
 
   def syncAskDriverNumaCount(): ReplyExecutorIdNumPerHost = {
-    driverEndpoint.askSync[ReplyExecutorIdNumPerHost](AskExecutorIdNumPerHost(executorId))
+    driverEndpoint
+      .askSync[ReplyExecutorIdNumPerHost](AskExecutorIdNumPerHost(executorId, rpcEnv.address.host))
   }
 
   protected def heartbeatMessages: Array[() => Heartbeat] = {
@@ -70,7 +71,8 @@ private[spark] class OapRpcManagerSlave(
   private def initialize() = {
     RpcEndpointRefAdapter.askSync[Boolean](
       driverEndpoint, RegisterOapRpcManager(executorId, slaveEndpoint))
-    conf.set(s"spark.sql.oap.${executorId}.numa.num", syncAskDriverNumaCount().num.toString)
+    val value = syncAskDriverNumaCount().num
+    conf.set(s"spark.sql.oap.${executorId}.numa.num", value.toString)
   }
 
   override private[spark] def send(message: OapMessage): Unit = {
