@@ -19,10 +19,10 @@ package org.apache.spark.sql.oap.rpc
 
 import scala.collection.mutable
 
-import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcCallContext, RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
-import org.apache.spark.scheduler.LiveListenerBus
+import org.apache.spark.scheduler.{LiveListenerBus, TaskSchedulerImpl}
+import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.sql.oap.listener.{SparkListenerCustomInfoUpdate, SparkListenerOapIndexInfoUpdate}
 import org.apache.spark.sql.oap.rpc.OapMessages._
 
@@ -60,6 +60,8 @@ private[spark] class OapRpcManagerMasterEndpoint(
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
     case RegisterOapRpcManager(executorId, slaveEndpoint) =>
       context.reply(handleRegistration(executorId, slaveEndpoint))
+    case AskExecutorIdNumPerHost(executorId) =>
+      context.reply(handleAskExecutorIdNum(executorId))
     case _ =>
   }
 
@@ -67,6 +69,41 @@ private[spark] class OapRpcManagerMasterEndpoint(
     case heartbeat: Heartbeat => handleHeartbeat(heartbeat)
     case message: OapMessage => handleNormalOapMessage(message)
     case _ =>
+  }
+
+  private def handleAskExecutorIdNum(executorId: String) {
+    val sparkContext = OapRuntime.get.get.sparkSession.sparkContext
+    val executorsAddress =
+      sparkContext.getExecutorMemoryStatus.map(_._1.toString.split(":")(0))
+    if (sparkContext.taskScheduler.isInstanceOf[TaskSchedulerImpl]) {
+      executorsAddress.foreach( hostname => {
+          val hasExecutor =
+            sparkContext.taskScheduler.asInstanceOf[TaskSchedulerImpl]
+              .hasExecutorsAliveOnHost(hostname)
+          if (hasExecutor) {
+            val ids =
+              sparkContext.taskScheduler.asInstanceOf[TaskSchedulerImpl]
+                .getExecutorsAliveOnHost(hostname)
+            ids match {
+              case Some(idsSet) =>
+                val num = idsSet.toSeq.sorted.indexOf(executorId)
+                if (num > 0) {
+                  return ReplyExecutorIdNumPerHost(executorId, num)
+                }
+              case None =>
+            }
+          }
+        }
+      )
+      return ReplyExecutorIdNumPerHost(executorId, -1)
+    } else {
+      // the sparkContext.getExecutorMemoryStatus() also returns driver's address.
+      // Without TaskSchedulerImpl.hasExecutorsAliveOnHost,
+      // can't tell if the node is running both driver and executor on it.
+      logInfo("taskScheduler is not an instance of TaskSchedulerImpl," +
+        " can't retrieve executor info for location aware.")
+      return ReplyExecutorIdNumPerHost(executorId, -1)
+    }
   }
 
   private def handleRegistration(executorId: String, ref: RpcEndpointRef): Boolean = {
