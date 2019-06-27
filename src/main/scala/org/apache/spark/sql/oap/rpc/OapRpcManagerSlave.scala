@@ -19,8 +19,6 @@ package org.apache.spark.sql.oap.rpc
 
 import java.util.concurrent.TimeUnit
 
-import scala.concurrent.Future
-
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
@@ -54,11 +52,6 @@ private[spark] class OapRpcManagerSlave(
   initialize()
   startOapHeartbeater()
 
-  def syncAskDriverNumaCount(): ReplyExecutorIdNumPerHost = {
-    driverEndpoint
-      .askSync[ReplyExecutorIdNumPerHost](AskExecutorIdNumPerHost(executorId, rpcEnv.address.host))
-  }
-
   protected def heartbeatMessages: Array[() => Heartbeat] = {
     Array(
       () => FiberCacheHeartbeat(
@@ -71,8 +64,6 @@ private[spark] class OapRpcManagerSlave(
   private def initialize() = {
     RpcEndpointRefAdapter.askSync[Boolean](
       driverEndpoint, RegisterOapRpcManager(executorId, slaveEndpoint))
-    val value = syncAskDriverNumaCount().num
-    conf.set(s"spark.sql.oap.${executorId}.numa.num", value.toString)
   }
 
   override private[spark] def send(message: OapMessage): Unit = {

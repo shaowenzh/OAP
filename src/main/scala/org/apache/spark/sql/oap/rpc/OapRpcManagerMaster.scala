@@ -17,14 +17,12 @@
 
 package org.apache.spark.sql.oap.rpc
 
-import java.util.concurrent.ConcurrentHashMap
-
 import scala.collection.mutable
 
+import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcCallContext, RpcEndpointRef, RpcEnv, ThreadSafeRpcEndpoint}
-import org.apache.spark.scheduler.{LiveListenerBus, TaskSchedulerImpl}
-import org.apache.spark.sql.oap.OapRuntime
+import org.apache.spark.scheduler.LiveListenerBus
 import org.apache.spark.sql.oap.listener.{SparkListenerCustomInfoUpdate, SparkListenerOapIndexInfoUpdate}
 import org.apache.spark.sql.oap.rpc.OapMessages._
 
@@ -58,13 +56,10 @@ private[spark] class OapRpcManagerMasterEndpoint(
 
   // Mapping from executor ID to RpcEndpointRef.
   private[rpc] val rpcEndpointRefByExecutor = new mutable.HashMap[String, RpcEndpointRef]
-  private[rpc] val rpcHostToExecutors = new ConcurrentHashMap[String, mutable.Buffer[String]]
 
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
     case RegisterOapRpcManager(executorId, slaveEndpoint) =>
       context.reply(handleRegistration(executorId, slaveEndpoint))
-    case AskExecutorIdNumPerHost(executorId, host) =>
-      context.reply(handleAskExecutorIdNum(executorId, host))
     case _ =>
   }
 
@@ -72,19 +67,6 @@ private[spark] class OapRpcManagerMasterEndpoint(
     case heartbeat: Heartbeat => handleHeartbeat(heartbeat)
     case message: OapMessage => handleNormalOapMessage(message)
     case _ =>
-  }
-
-  private def handleAskExecutorIdNum(
-    executorId: String,
-    host: String): ReplyExecutorIdNumPerHost = {
-    if (this.rpcHostToExecutors.containsKey(host)) {
-      if (!this.rpcHostToExecutors.get(host).contains(executorId)) {
-        this.rpcHostToExecutors.get(host) += executorId
-      }
-    } else {
-      this.rpcHostToExecutors.putIfAbsent(host, mutable.Buffer[String](executorId))
-    }
-    ReplyExecutorIdNumPerHost(executorId, this.rpcHostToExecutors.get(host).indexOf(executorId))
   }
 
   private def handleRegistration(executorId: String, ref: RpcEndpointRef): Boolean = {

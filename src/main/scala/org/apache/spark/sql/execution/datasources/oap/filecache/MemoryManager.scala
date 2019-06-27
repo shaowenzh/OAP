@@ -28,9 +28,11 @@ import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
+import org.apache.spark.sql.oap.rpc.OapMessages.{AskExecutorIdNumPerHost, ReplyExecutorIdNumPerHost}
+import org.apache.spark.sql.oap.rpc.OapPmRpcDriverEndpoint
 import org.apache.spark.storage.{BlockManager, TestBlockId}
 import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform}
-import org.apache.spark.util.Utils
+import org.apache.spark.util.{RpcUtils, Utils}
 
 object CacheEnum extends Enumeration {
   type CacheEnum = Value
@@ -249,10 +251,17 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     // The NUMA id should be set when the executor process start up. However, Spark don't
     // support NUMA binding currently.
     var numaId = conf.getInt("spark.executor.numa.id", -1)
-    val executorId = sparkEnv.executorId.toInt
+    val executorId = sparkEnv.executorId
+
+    val oapPmRpcDriverEndpoint = RpcUtils.makeDriverRef(
+      OapPmRpcDriverEndpoint.DRIVER_PM_ENDPOINT_NAME, sparkEnv.conf, sparkEnv.rpcEnv)
+
+    val driverReply = oapPmRpcDriverEndpoint.askSync[ReplyExecutorIdNumPerHost](
+        AskExecutorIdNumPerHost(executorId, Utils.localHostName()))
+    val idNum = driverReply.num
+
     val map = PersistentMemoryConfigUtils.parseConfig(conf)
     if (numaId == -1) {
-      val idNum = conf.get(s"spark.sql.oap.${executorId}.numa.num").toInt
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
         s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
       // Just round the executorId to the total NUMA number.
