@@ -142,12 +142,21 @@ private[sql] object MemoryManager {
 
   def apply(sparkEnv: SparkEnv): MemoryManager = {
     val conf = sparkEnv.conf
+    val indexDataSeparationEnable = conf.getBoolean(
+      OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.key,
+      OapConf.OAP_INDEX_DATA_SEPARATION_ENABLE.defaultValue.get
+    )
     val memoryManagerOpt =
       conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
     memoryManagerOpt match {
       case "offheap" => new OffHeapMemoryManager(sparkEnv)
       case "pm" => new PersistentMemoryManager(sparkEnv)
-      case "mix" => new MixMemoryManager(sparkEnv)
+      case "mix" => if (indexDataSeparationEnable) {
+        new MixMemoryManager(sparkEnv)
+      } else {
+        throw new UnsupportedOperationException("In order to enable MixMemoryManager," +
+          "you need to set to spark.sql.oap.index.data.cache.separation.enable to true")
+      }
       case _ => throw new UnsupportedOperationException(
         s"The memory manager: ${memoryManagerOpt} is not supported now")
     }
