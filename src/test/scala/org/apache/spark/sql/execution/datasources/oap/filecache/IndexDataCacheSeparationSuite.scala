@@ -349,6 +349,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     Thread.sleep(100)
     dataResults.foreach(r => r.get())
     indexResults.foreach(r => r.get())
+    Thread.sleep(2000) // wait for pending cache to free
     assert(fiberCacheManager.pendingCount == 0)
     // Call the following to evict all the fibers in case it has a impact on the following test.
     fiberCacheManager.clearAllFibers()
@@ -389,7 +390,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     val pool = Executors.newCachedThreadPool()
     val data = generateData(kbSize)
     val dataFiber =
-      TestDataFiberId(() => memoryManager.toDataFiberCache(data), s"get release test")
+      TestDataFiberId(() => memoryManager.toDataFiberCache(data), s"data get release test")
     def dataWork(): Boolean = {
       val fiberCache = fiberCacheManager.get(dataFiber)
       val flag = fiberCache.refCount > 0 || !fiberCache.isDisposed
@@ -398,7 +399,7 @@ class IndexDataCacheSeparationSuite extends SharedOapContext with BeforeAndAfter
     }
 
     val indexFiber =
-      TestIndexFiberId(() => memoryManager.toDataFiberCache(data), s"get release test")
+      TestIndexFiberId(() => memoryManager.toDataFiberCache(data), s"index get release test")
     def indexWork(): Boolean = {
       val fiberCache = fiberCacheManager.get(indexFiber)
       val flag = fiberCache.refCount > 0 || !fiberCache.isDisposed

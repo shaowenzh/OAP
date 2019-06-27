@@ -225,6 +225,7 @@ class FiberCacheManagerSuite extends SharedOapContext {
     pool.awaitTermination(1000, TimeUnit.MILLISECONDS)
     Thread.sleep(100)
     results.foreach(r => r.get())
+    Thread.sleep(2000) // wait for pending cache to free
     assert(fiberCacheManager.pendingCount == 0)
   }
 
