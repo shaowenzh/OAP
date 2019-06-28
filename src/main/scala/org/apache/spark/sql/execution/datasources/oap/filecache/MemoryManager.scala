@@ -253,15 +253,14 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     var numaId = conf.getInt("spark.executor.numa.id", -1)
     val executorId = sparkEnv.executorId
 
-    val oapPmRpcDriverEndpoint = RpcUtils.makeDriverRef(
-      OapPmRpcDriverEndpoint.DRIVER_PM_ENDPOINT_NAME, sparkEnv.conf, sparkEnv.rpcEnv)
-
-    val driverReply = oapPmRpcDriverEndpoint.askSync[ReplyExecutorIdNumPerHost](
-        AskExecutorIdNumPerHost(executorId, Utils.localHostName()))
-    val idNum = driverReply.num
-
     val map = PersistentMemoryConfigUtils.parseConfig(conf)
     if (numaId == -1) {
+      val oapPmRpcDriverEndpoint = RpcUtils.makeDriverRef(
+        OapPmRpcDriverEndpoint.DRIVER_PM_ENDPOINT_NAME, sparkEnv.conf, sparkEnv.rpcEnv)
+      val driverReply = oapPmRpcDriverEndpoint.askSync[ReplyExecutorIdNumPerHost](
+        AskExecutorIdNumPerHost(executorId, Utils.localHostName()))
+      val idNum = driverReply.num
+
       logWarning(s"Executor ${executorId} is not bind with NUMA. It would be better to bind " +
         s"executor with NUMA when cache data to Intel Optane DC persistent memory.")
       // Just round the executorId to the total NUMA number.
