@@ -169,6 +169,13 @@ object OapConf {
       .stringConf
       .createWithDefault("pm")
 
+  val OAP_YARN_NUMA_ENABLE =
+    SqlConfAdapter.buildConf("spark.sql.oap.yarn.numa.enable")
+      .internal()
+      .doc("To enable numa binding under yarn mode")
+      .booleanConf
+      .createWithDefault(true)
+
   val OAP_FIBERCACHE_PERSISTENT_MEMORY_CONFIG_FILE =
     SqlConfAdapter.buildConf("spark.sql.oap.fiberCache.persistent.memory.config.file")
       .internal()

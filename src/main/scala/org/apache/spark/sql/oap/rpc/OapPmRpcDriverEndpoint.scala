@@ -22,31 +22,23 @@ import scala.collection.mutable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcCallContext, RpcEnv, ThreadSafeRpcEndpoint}
+import org.apache.spark.sql.execution.datasources.oap.filecache.NumaManager
 import org.apache.spark.sql.oap.rpc.OapMessages.{AskExecutorIdNumPerHost, ReplyExecutorIdNumPerHost}
 
 private[spark] class OapPmRpcDriverEndpoint(
-  override val rpcEnv: RpcEnv)
+  override val rpcEnv: RpcEnv,
+  numaManager: NumaManager)
   extends ThreadSafeRpcEndpoint with Logging {
 
-  private[rpc] val rpcHostToExecutors = new ConcurrentHashMap[String, mutable.Buffer[String]]
-
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
-    case AskExecutorIdNumPerHost(executorId, host) =>
-      context.reply(handleAskExecutorIdNum(executorId, host))
+    case AskExecutorIdNumPerHost(executorId) =>
+      context.reply(handleAskExecutorIdNum(executorId))
     case _ =>
   }
 
   private def handleAskExecutorIdNum(
-    executorId: String,
-    host: String): ReplyExecutorIdNumPerHost = {
-    if (this.rpcHostToExecutors.containsKey(host)) {
-      if (!this.rpcHostToExecutors.get(host).contains(executorId)) {
-        this.rpcHostToExecutors.get(host) += executorId
-      }
-    } else {
-      this.rpcHostToExecutors.putIfAbsent(host, mutable.Buffer[String](executorId))
-    }
-    ReplyExecutorIdNumPerHost(executorId, this.rpcHostToExecutors.get(host).indexOf(executorId))
+    executorId: String): ReplyExecutorIdNumPerHost = {
+    ReplyExecutorIdNumPerHost(executorId, numaManager.getNumaId(executorId))
   }
 }
 

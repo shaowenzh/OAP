@@ -29,7 +29,6 @@ import org.apache.spark.sql.execution.datasources.oap.OapMetricsManager
 import org.apache.spark.sql.execution.datasources.oap.filecache._
 import org.apache.spark.sql.execution.datasources.oap.filecache.FiberSensor.HostFiberCache
 import org.apache.spark.sql.hive.thriftserver.OapEnv
-import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.rpc._
 import org.apache.spark.util.{RpcUtils, Utils}
 
@@ -113,17 +112,10 @@ private[sql] class OapDriverRuntime(sparkEnv: SparkEnv) extends OapRuntime {
   }
 
   private def setupPersistentMemoryInitRpc(): Unit = {
-    val memoryManagerType =
-      sparkEnv.conf.get(OapConf.OAP_FIBERCACHE_MEMORY_MANAGER.key, "offheap").toLowerCase
-    val isPmOrMixMemoryManager = memoryManagerType match {
-      case "pm" => true
-      case "mix" => true
-      case _ => false
-    }
-
-    if (isPmOrMixMemoryManager) {
+    val numaManager = NumaManager.getOrCreate
+    if (numaManager.isNumaPathNeeded()) {
       val oapPmRpcDriverEndpoint =
-        new OapPmRpcDriverEndpoint(sparkEnv.rpcEnv)
+        new OapPmRpcDriverEndpoint(sparkEnv.rpcEnv, numaManager)
 
       sparkEnv.rpcEnv.setupEndpoint(
         OapPmRpcDriverEndpoint.DRIVER_PM_ENDPOINT_NAME, oapPmRpcDriverEndpoint)
