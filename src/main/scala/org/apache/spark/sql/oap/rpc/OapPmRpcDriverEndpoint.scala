@@ -31,14 +31,20 @@ private[spark] class OapPmRpcDriverEndpoint(
   extends ThreadSafeRpcEndpoint with Logging {
 
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
-    case AskExecutorIdNumPerHost(executorId) =>
-      context.reply(handleAskExecutorIdNum(executorId))
+    case AskExecutorIdNumPerHost(executorId, host) =>
+      context.reply(handleAskExecutorIdNum(executorId, host))
     case _ =>
   }
 
   private def handleAskExecutorIdNum(
-    executorId: String): ReplyExecutorIdNumPerHost = {
-    ReplyExecutorIdNumPerHost(executorId, numaManager.getNumaId(executorId))
+    executorId: String, host: String): ReplyExecutorIdNumPerHost = {
+    val numaId = numaManager.getOrRegisterExecutorNumaId(executorId, host)
+    numaId match {
+      case Some(id) => ReplyExecutorIdNumPerHost(executorId, id)
+      case None => throw new UnsupportedOperationException(
+        s"Can't get expected Numa Id for executor ${executorId}")
+    }
+
   }
 }
 
