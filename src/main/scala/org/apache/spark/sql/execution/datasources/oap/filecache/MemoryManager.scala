@@ -266,8 +266,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
       // Just round the executorId to the total NUMA number.
       // TODO: improve here
       numaId = idNum % PersistentMemoryConfigUtils.totalNumaNode(conf)
-      logWarning(s"using id number assigned from driver:${idNum}, " +
-        s"numa id calculate by executor: ${numaId}")
+      logWarning(s"using numa id number assigned from driver:${idNum}")
     }
 
     val initialPath = map.get(numaId).get
