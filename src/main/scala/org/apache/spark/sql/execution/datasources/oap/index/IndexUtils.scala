@@ -206,16 +206,26 @@ private[oap] object IndexUtils {
    * @param conf the configuration to get the value of OapConf.OAP_INDEX_DIRECTORY
    * @return the outPutPath to save the job temporary data
    */
-  def getOutputPathBasedOnConf(fileIndex: FileIndex, conf: RuntimeConfig): Path = {
+  def getOutputPathBasedOnConf(
+    fileIndex: FileIndex,
+    conf: RuntimeConfig,
+    hadoopConf: Configuration): Path = {
     def getTableBaseDir(path: Path, times: Int): Path = {
       if (times > 0) getTableBaseDir(path.getParent, times - 1)
       else path
     }
+
+    def getDirIfisFile(path: Path): Path = {
+      val fs = path.getFileSystem(hadoopConf)
+       if (fs.isFile(path)) path.getParent
+       else path
+    }
+
     val paths = fileIndex.rootPaths
     assert(paths.nonEmpty, "Expected at least one path of fileIndex.rootPaths, but no value")
     val dataPath = paths.length match {
-      case 1 => paths.head
-      case _ => getTableBaseDir(paths.head, fileIndex.partitionSchema.length)
+      case 1 => getDirIfisFile(paths.head)
+      case _ => getTableBaseDir(getDirIfisFile(paths.head), fileIndex.partitionSchema.length)
     }
 
     val indexDirectory = conf.get(OapConf.OAP_INDEX_DIRECTORY.key)

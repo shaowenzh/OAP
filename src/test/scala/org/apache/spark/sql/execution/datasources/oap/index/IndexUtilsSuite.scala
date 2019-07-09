@@ -333,31 +333,35 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
 
   test("test rootPaths empty") {
     val fileIndex = new InMemoryFileIndex(spark, Seq.empty, Map.empty, None)
+    val configuration = spark.sessionState.newHadoopConf()
     intercept[AssertionError] {
-      IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+      IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf, configuration)
     }
   }
 
   test("test rootPaths length eq 1 no partitioned") {
+    val configuration = spark.sessionState.newHadoopConf()
     val tablePath = new Path("/table")
     val rootPaths = Seq(tablePath)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, None)
-    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf, configuration)
     assert(ret.equals(tablePath))
   }
 
   test("test rootPaths length eq 1 partitioned") {
+    val configuration = spark.sessionState.newHadoopConf()
     val tablePath = new Path("/table")
     val partitionSchema = new StructType()
       .add(StructField("a", StringType))
       .add(StructField("b", StringType))
     val rootPaths = Seq(tablePath)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
-    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf, configuration)
     assert(ret.equals(tablePath))
   }
 
   test("test rootPaths length more than 1") {
+    val configuration = spark.sessionState.newHadoopConf()
     val part1 = new Path("/table/a=1/b=1")
     val part2 = new Path("/table/a=1/b=2")
     val tablePath = new Path("/table")
@@ -366,18 +370,19 @@ class IndexUtilsSuite extends SparkFunSuite with SharedOapContext with Logging {
       .add(StructField("b", StringType))
     val rootPaths = Seq(part1, part2)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
-    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf, configuration)
     assert(ret.equals(tablePath))
   }
 
   test("test rootPaths length eq 1 but partitioned") {
+    val configuration = spark.sessionState.newHadoopConf()
     val part1 = new Path("/table/a=1/b=1")
     val partitionSchema = new StructType()
       .add(StructField("a", StringType))
       .add(StructField("b", StringType))
     val rootPaths = Seq(part1)
     val fileIndex = new InMemoryFileIndex(spark, rootPaths, Map.empty, Some(partitionSchema))
-    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf)
+    val ret = IndexUtils.getOutputPathBasedOnConf(fileIndex, spark.conf, configuration)
     assert(ret.equals(part1))
   }
 }
