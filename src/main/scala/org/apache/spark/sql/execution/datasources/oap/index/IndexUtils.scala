@@ -217,8 +217,8 @@ private[oap] object IndexUtils {
 
     def getDirIfisFile(path: Path): Path = {
       val fs = path.getFileSystem(hadoopConf)
-       if (fs.isFile(path)) path.getParent
-       else path
+      if (fs.isFile(path)) path.getParent
+      else path
     }
 
     val paths = fileIndex.rootPaths
