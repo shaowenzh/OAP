@@ -44,16 +44,13 @@ class IndexCreateSuite extends QueryTest with SharedOapContext with BeforeAndAft
     super.afterAll()
   }
 
-  override def beforeEach(): Unit = {
-    val path = Utils.createTempDir().getAbsolutePath
-    currentParquetPath = path + "/test"
-  }
-
-  test("OAP#1061 Index path fault for path like /*.parquet") {
+  test("OAP#1061 Index path fault when create temp view using this path format /*.parquet") {
+    val tempDir = Utils.createTempDir()
+    val path = tempDir.getAbsolutePath + "/test"
     val dataDF =
       (1 to 300).map { i => (i, s"this is test $i") }.toDF("a", "b")
-    dataDF.write.parquet(currentParquetPath);
-    spark.read.parquet(s"${currentParquetPath}/*.parquet")
+    dataDF.write.parquet(path);
+    spark.read.parquet(s"${path}/*.parquet")
       .createOrReplaceTempView("parquet_test")
     withIndex(TestIndex("parquet_test", "indexA")) {
       // create index
@@ -65,5 +62,6 @@ class IndexCreateSuite extends QueryTest with SharedOapContext with BeforeAndAft
       assert(afterQuery == beforeQuery + 4)
     }
     sqlContext.dropTempTable("parquet_test")
+    Utils.deleteRecursively(tempDir)
   }
 }
