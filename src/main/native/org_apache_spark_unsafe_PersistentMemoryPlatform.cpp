@@ -56,7 +56,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_ini
   const char* str = env->GetStringUTFChars(path, NULL);
   size_t sz = (size_t)size;
   // Initialize persistent memory
-  memkind_config = memkind_config_new();
+  pmemkind_config = memkind_config_new();
   memkind_config_set_path(pmemkind_config, str);
   memkind_config_set_size(pmemkind_config, sz);
   memkind_config_set_memory_usage_policy(pmemkind_config, MEMKIND_MEM_USAGE_POLICY_CONSERVATIVE);
