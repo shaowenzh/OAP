@@ -40,7 +40,7 @@ import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, Re
 import org.apache.spark.sql.hive.orc.ReadOnlyOrcFileFormat
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.sql.oap.OapRuntime
-import org.apache.spark.sql.oap.rpc.OapMessages.CacheDrop
+import org.apache.spark.sql.oap.rpc.OapMessages.{CacheDrop, CacheDropCache}
 import org.apache.spark.sql.types._
 
 /**
@@ -235,6 +235,21 @@ case class CreateIndexCommand(
       configuration,
       bp._1.build(),
       deleteIfExits = true))
+    Seq.empty
+  }
+}
+
+case class DropCacheCommand(name: String) extends RunnableCommand with Logging {
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    logWarning("to clear all cache")
+    val scheduler = sparkSession.sparkContext.schedulerBackend
+    scheduler match {
+      case _: CoarseGrainedSchedulerBackend =>
+        OapRuntime.getOrCreate.oapRpcManager.send(CacheDropCache(""))
+      case _: LocalSchedulerBackend =>
+        OapRuntime.getOrCreate.fiberCacheManager.clearAllFibers()
+    }
     Seq.empty
   }
 }

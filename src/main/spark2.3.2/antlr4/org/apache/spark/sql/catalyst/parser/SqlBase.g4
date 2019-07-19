@@ -175,6 +175,7 @@ statement
         partitionSpec?                                                 #oapDropIndex
     | DISABLE SINDEX IDENTIFIER                                        #oapDisableIndex
     | ENABLE SINDEX IDENTIFIER                                         #oapEnableIndex
+    | DROP OAP CACHE                                                   #oapDropCache
     | SHOW SINDEX (FROM | IN) tableIdentifier                          #oapShowIndex
     | CHECK SINDEX ON tableIdentifier partitionSpec?                   #oapCheckIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
@@ -1013,6 +1014,8 @@ OPTION: 'OPTION';
 ANTI: 'ANTI';
 LOCAL: 'LOCAL';
 INPATH: 'INPATH';
+OAP: 'OAP';
+
 
 CHECK: 'CHECK';
 SINDEX: 'SINDEX' | 'OINDEX';

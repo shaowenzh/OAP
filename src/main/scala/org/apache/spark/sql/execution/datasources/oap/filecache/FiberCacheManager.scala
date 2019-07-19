@@ -179,7 +179,7 @@ private[sql] class FiberCacheManager(
   }
 
   // Used by test suite
-  private[oap] def clearAllFibers(): Unit = cacheBackend.cleanUp
+  def clearAllFibers(): Unit = cacheBackend.cleanUp
 
   // TODO: test case, consider data eviction, try not use DataFileMeta which my be costly
   private[sql] def status(): String = {

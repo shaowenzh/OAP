@@ -77,6 +77,10 @@ class OapSparkSqlAstBuilder(conf: SQLConf) extends SparkSqlAstBuilder(conf) {
       Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
   }
 
+  override def visitOapDropCache(ctx: OapDropCacheContext): LogicalPlan = withOrigin(ctx) {
+    DropCacheCommand("drop cache")
+  }
+
   override def visitIndexCols(ctx: IndexColsContext): Array[IndexColumn] = withOrigin(ctx) {
     ctx.indexCol.toArray(new Array[IndexColContext](ctx.indexCol.size)).map(visitIndexCol)
   }
