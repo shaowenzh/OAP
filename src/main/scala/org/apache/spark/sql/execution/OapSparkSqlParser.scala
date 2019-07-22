@@ -28,8 +28,8 @@ import org.apache.spark.sql.oap.rpc.CacheBehaviorEnum
 /**
  * Concrete parser for Spark SQL statements.
  */
- class OapSparkSqlParser extends AbstractSqlParser {
-  lazy val conf = SparkSession.getActiveSession.get.sessionState.conf
+ class OapSparkSqlParser(session: SparkSession) extends AbstractSqlParser {
+  lazy val conf = session.sessionState.conf
   lazy val astBuilder = new OapSparkSqlAstBuilder(conf)
 
   private lazy val substitutor = new VariableSubstitution(conf)
