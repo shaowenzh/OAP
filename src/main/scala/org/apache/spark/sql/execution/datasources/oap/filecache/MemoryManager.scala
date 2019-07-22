@@ -79,6 +79,11 @@ private[sql] abstract class MemoryManager {
    */
   def cacheGuardianMemory: Long
 
+  def resetCachePool(): Unit = {
+    throw new UnsupportedOperationException(
+      "Current memory manager doesn't support reset cache pool")
+  }
+
   /**
    * Allocate a block of memory with given size. The actual occupied size of memory maybe different
    * with the requested size, that's depends on the underlying implementation.
@@ -231,6 +236,7 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
   override def stop(): Unit = {
     memoryManager.releaseStorageMemory(oapMemory, MemoryMode.OFF_HEAP)
   }
+
 }
 
 /**
@@ -244,7 +250,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 
   private val _memoryUsed = new AtomicLong(0)
 
-  private def init(): (Long, Long, Long) = {
+  def init(): (Long, Long, Long) = {
     val conf = sparkEnv.conf
     // The NUMA id should be set when the executor process start up. However, Spark don't
     // support NUMA binding currently.
@@ -306,6 +312,15 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     PersistentMemoryPlatform.freeMemory(block.baseOffset)
     _memoryUsed.getAndAdd(-block.occupiedSize)
     logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
+  }
+
+
+  override def resetCachePool(): Unit = {
+    PersistentMemoryPlatform.destroyKind()
+    PersistentMemoryPlatform.resetInitFlag()
+    logInfo("memory manager destroyed cache pool")
+    this.init()
+    logInfo("memory manager finished initialization")
   }
 }
 
@@ -391,4 +406,17 @@ private[filecache] class MixMemoryManager(sparkEnv: SparkEnv)
 
   override def cacheGuardianMemory: Long =
     indexMemoryManager.cacheGuardianMemory + dataMemoryManager.cacheGuardianMemory
+
+  override def resetCachePool(): Unit = {
+    PersistentMemoryPlatform.destroyKind()
+    PersistentMemoryPlatform.resetInitFlag()
+    logInfo("memory manager destroyed cache pool")
+    if (dataMemoryManager.isInstanceOf[PersistentMemoryManager]) {
+      dataMemoryManager.asInstanceOf[PersistentMemoryManager].init();
+    }
+    if (indexMemoryManager.isInstanceOf[PersistentMemoryManager]) {
+      indexMemoryManager.asInstanceOf[PersistentMemoryManager].init();
+    }
+    logInfo("memory manager finished initialization")
+  }
 }

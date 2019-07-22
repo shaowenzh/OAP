@@ -99,6 +99,8 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 private[sql] class FiberCacheManager(
     sparkEnv: SparkEnv, memoryManager: MemoryManager) extends Logging {
 
+  private val resetReadWriteLock = new ReentrantReadWriteLock()
+
   private val GUAVA_CACHE = "guava"
   private val SIMPLE_CACHE = "simple"
   private val DEFAULT_CACHE_STRATEGY = GUAVA_CACHE
@@ -141,8 +143,11 @@ private[sql] class FiberCacheManager(
   logDebug(s"Initialized FiberCacheManager")
 
   def get(fiber: FiberId): FiberCache = {
+    resetReadWriteLock.readLock().lock()
     logDebug(s"Getting Fiber: $fiber")
-    cacheBackend.get(fiber)
+    val FiberCache = cacheBackend.get(fiber)
+    resetReadWriteLock.readLock().unlock()
+    FiberCache
   }
   // only for unit test
   def setCompressionConf(dataEnable: Boolean = false,
@@ -180,6 +185,19 @@ private[sql] class FiberCacheManager(
 
   // Used by test suite
   def clearAllFibers(): Unit = cacheBackend.cleanUp
+
+  def resetAll(): Unit = {
+    resetReadWriteLock.writeLock().lock()
+    clearAllFibers()
+    while (cacheBackend.pendingFiberCount > 0) {
+      Thread.sleep(100)
+    }
+    if (memoryManager.isInstanceOf[PersistentMemoryManager]
+      || memoryManager.isInstanceOf[MixMemoryManager]) {
+      memoryManager.resetCachePool()
+    }
+    resetReadWriteLock.writeLock().unlock()
+  }
 
   // TODO: test case, consider data eviction, try not use DataFileMeta which my be costly
   private[sql] def status(): String = {

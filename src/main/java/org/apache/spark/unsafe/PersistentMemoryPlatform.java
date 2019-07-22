@@ -36,6 +36,10 @@ public class PersistentMemoryPlatform {
     NativeLibraryLoader.load(LIBNAME);
   }
 
+  public static void resetInitFlag() {
+    initialized = false;
+  }
+
   /**
    * Initialize the persistent memory.
    * @param path The initial path which should be a directory.
@@ -84,4 +88,6 @@ public class PersistentMemoryPlatform {
    * Free the memory by address.
    */
   public static native void freeMemory(long address);
+
+  public static native void destroyKind();
 }

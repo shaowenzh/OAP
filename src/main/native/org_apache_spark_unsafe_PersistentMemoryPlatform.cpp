@@ -26,7 +26,6 @@
 
 using memkind = struct memkind;
 memkind *pmemkind = NULL;
-struct memkind_config *pmemkind_config;
 
 // copied form openjdk: http://hg.openjdk.java.net/jdk8/jdk8/hotspot/file/87ee5ee27509/src/share/vm/prims/unsafe.cpp
 inline void* addr_from_java(jlong addr) {
@@ -56,11 +55,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_ini
   const char* str = env->GetStringUTFChars(path, NULL);
   size_t sz = (size_t)size;
   // Initialize persistent memory
-  pmemkind_config = memkind_config_new();
-  memkind_config_set_path(pmemkind_config, str);
-  memkind_config_set_size(pmemkind_config, sz);
-  memkind_config_set_memory_usage_policy(pmemkind_config, MEMKIND_MEM_USAGE_POLICY_CONSERVATIVE);
-  int error = memkind_create_pmem_with_config(pmemkind_config, &pmemkind);
+  int error = memkind_create_pmem(str, sz, &pmemkind);
   if (error) {
     jclass exceptionCls = env->FindClass("java/lang/Exception");
     env->ThrowNew(exceptionCls,
@@ -99,4 +94,15 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_fre
   (JNIEnv *env, jclass clazz, jlong address) {
   check(env);
   memkind_free(pmemkind, addr_from_java(address));
+}
+
+JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_destroyKind
+  (JNIEnv *env, jclass clazz) {
+  check(env);
+  int error = memkind_destroy_kind(pmemkind);
+  if (error) {
+      jclass exceptionCls = env->FindClass("java/lang/Exception");
+      env->ThrowNew(exceptionCls,
+        "Persistent Memory destroy failed!");
+    }
 }

@@ -20,6 +20,11 @@ package org.apache.spark.sql.oap.rpc
 import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.storage.BlockManagerId
 
+object CacheBehaviorEnum extends Enumeration {
+  type CacheBehaviorEnum = Value
+  val RESET = Value
+}
+
 private[spark] object OapMessages {
 
   sealed trait OapMessage extends Serializable
@@ -34,7 +39,8 @@ private[spark] object OapMessages {
 
   /* Master to slave messages */
   case class CacheDrop(indexName: String) extends ToOapRpcManagerSlave
-  case class CacheDropCache(name: String) extends ToOapRpcManagerSlave
+  case class OapCacheControlMsg(behavior: CacheBehaviorEnum.CacheBehaviorEnum)
+    extends ToOapRpcManagerSlave
 
   /* Slave to master messages */
   case class RegisterOapRpcManager(

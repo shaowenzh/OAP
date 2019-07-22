@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.oap.index._
 import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
+import org.apache.spark.sql.oap.rpc.CacheBehaviorEnum
 
 /**
  * Concrete parser for Spark SQL statements.
@@ -77,8 +78,8 @@ class OapSparkSqlAstBuilder(conf: SQLConf) extends SparkSqlAstBuilder(conf) {
       Option(ctx.partitionSpec).map(visitNonOptionalPartitionSpec))
   }
 
-  override def visitOapDropCache(ctx: OapDropCacheContext): LogicalPlan = withOrigin(ctx) {
-    DropCacheCommand("drop cache")
+  override def visitOapResetCache(ctx: OapResetCacheContext): LogicalPlan = withOrigin(ctx) {
+    OapCacheCommand(CacheBehaviorEnum.RESET)
   }
 
   override def visitIndexCols(ctx: IndexColsContext): Array[IndexColumn] = withOrigin(ctx) {
