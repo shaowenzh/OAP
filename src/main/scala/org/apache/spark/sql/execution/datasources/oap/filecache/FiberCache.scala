@@ -21,10 +21,11 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.primitives.Ints
-import scala.collection.mutable
 
+import scala.collection.mutable
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
+import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
 import org.apache.spark.sql.oap.OapRuntime
 import org.apache.spark.unsafe.Platform
 import org.apache.spark.unsafe.types.UTF8String
@@ -43,12 +44,28 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   // record whether the fiber is compressed
   var fiberCompressed: Boolean = false
 
+  // This suppose to be used when cache allocation failed
+  var column: OnHeapColumnVector = null
+
   // We use readLock to lock occupy. _refCount need be atomic to make sure thread-safe
   protected val _refCount = new AtomicLong(0)
   def refCount: Long = _refCount.get()
 
   def occupy(): Unit = {
     _refCount.incrementAndGet()
+  }
+
+  def setColumn(column: OnHeapColumnVector): Unit = {
+    if (fiberData.cacheType == CacheEnum.FAIL) {
+      this.column = column;
+    } else {
+      throw new UnsupportedOperationException(
+        "fiber cache column can only be set when cache allocation failed")
+    }
+  }
+
+  def getColumn(): OnHeapColumnVector = {
+    column
   }
 
   // TODO: seems we are safe even on lock for release.

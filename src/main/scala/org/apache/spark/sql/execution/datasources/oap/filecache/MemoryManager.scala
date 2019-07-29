@@ -34,7 +34,7 @@ import org.apache.spark.util.Utils
 
 object CacheEnum extends Enumeration {
   type CacheEnum = Value
-  val INDEX, DATA, GENERAL = Value
+  val INDEX, DATA, GENERAL, FAIL = Value
 }
 
 /**
