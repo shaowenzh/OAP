@@ -38,35 +38,18 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
     val dictionaryIds = column.reserveDictionaryIds(num).asInstanceOf[OnHeapColumnVector]
     header match {
       case ParquetDataFiberHeader(true, false, _) =>
-        if (fiberCache.getColumn() == null) {
-          val dataNativeAddress = address + ParquetDataFiberHeader.defaultSize
-          Platform.copyMemory(null,
-            dataNativeAddress + start * 4L,
-            dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
-        } else {
-          Platform.copyMemory(
-            fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
-            Platform.INT_ARRAY_OFFSET + start * 4L,
-            dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
-        }
+        Platform.copyMemory(
+          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
+          Platform.INT_ARRAY_OFFSET + start * 4L,
+          dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
       case ParquetDataFiberHeader(false, false, _) =>
-        if (fiberCache.getColumn() == null) {
-          val nullsNativeAddress = address + ParquetDataFiberHeader.defaultSize
-          Platform.copyMemory(null,
-            nullsNativeAddress + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
-          val dataNativeAddress = nullsNativeAddress + 1 * total
-          Platform.copyMemory(null,
-            dataNativeAddress + start * 4L,
-            dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
-        } else {
-          Platform.copyMemory(
-            fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getNulls,
-            Platform.BYTE_ARRAY_OFFSET + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
-          Platform.copyMemory(
-            fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
-            Platform.INT_ARRAY_OFFSET + start * 4L,
-            dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
-        }
+        Platform.copyMemory(
+          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getNulls,
+          Platform.BYTE_ARRAY_OFFSET + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
+        Platform.copyMemory(
+          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
+          Platform.INT_ARRAY_OFFSET + start * 4L,
+          dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
       case ParquetDataFiberHeader(false, true, _) =>
         // can to this branch ?
         column.putNulls(0, num)
@@ -78,24 +61,11 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
     column.setDictionary(null)
     header match {
       case ParquetDataFiberHeader(true, false, _) =>
-        if (fiberCache.getColumn() == null) {
-          val dataNativeAddress = address + ParquetDataFiberHeader.defaultSize
-          readBatch(dataNativeAddress, start, num, column)
-        } else {
-          readBatchFromColumn(start, num, column)
-        }
+        readBatchFromColumn(start, num, column)
       case ParquetDataFiberHeader(false, false, _) =>
-        if (fiberCache.getColumn() == null) {
-          val nullsNativeAddress = address + ParquetDataFiberHeader.defaultSize
-          Platform.copyMemory(null,
-            nullsNativeAddress + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
-          val dataNativeAddress = nullsNativeAddress + 1 * total
-          readBatch(dataNativeAddress, start, num, column)
-        } else {
-          Platform.copyMemory(fiberCache.getColumn().getNulls,
-            Platform.BYTE_ARRAY_OFFSET + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
-          readBatchFromColumn(start, num, column)
-        }
+        Platform.copyMemory(fiberCache.getColumn().getNulls,
+          Platform.BYTE_ARRAY_OFFSET + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
+        readBatchFromColumn(start, num, column)
       case ParquetDataFiberHeader(false, true, _) =>
         column.putNulls(0, num)
       case ParquetDataFiberHeader(true, true, _) =>

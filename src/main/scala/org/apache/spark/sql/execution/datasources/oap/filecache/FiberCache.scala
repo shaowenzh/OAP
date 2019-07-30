@@ -117,7 +117,11 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   def isDisposed: Boolean = disposed
   protected[filecache] def realDispose(): Unit = {
     if (!disposed) {
-      OapRuntime.get.foreach(_.memoryManager.free(fiberData))
+      if (!isFailedMemoryBlock()) {
+        OapRuntime.get.foreach(_.memoryManager.free(fiberData))
+      } else {
+        this.column = null;
+      }
       OapRuntime.get.foreach(_.fiberLockManager.removeFiberLock(fiberId))
     }
     disposed = true

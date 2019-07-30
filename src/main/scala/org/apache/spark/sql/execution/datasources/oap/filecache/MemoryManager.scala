@@ -219,7 +219,6 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
       s"${size}, used: $memoryUsed")
     // For OFF_HEAP, occupied size also equal to the size.
     MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, size)
-    MemoryBlockHolder(CacheEnum.FAIL, null, 0L, 0L, 0L)
   }
 
   override private[filecache] def free(block: MemoryBlockHolder): Unit = {

@@ -140,9 +140,7 @@ class GuavaOapCache(
   private val removalListener = new RemovalListener[FiberId, FiberCache] {
     override def onRemoval(notification: RemovalNotification[FiberId, FiberCache]): Unit = {
       logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
-      if (!notification.getValue.isFailedMemoryBlock()) {
-        cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
-      }
+      cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
       decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }
