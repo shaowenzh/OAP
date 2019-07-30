@@ -76,7 +76,9 @@ class IndexedVectorizedCacheReader(
     currentPageNumber += 1
 
     while (ids == null || ids.isEmpty) {
-      skipBatchInternal()
+      if (hasFailedMemoryBlock) {
+        skipBatchInternal()
+      }
       ids = idsMap.remove(currentPageNumber)
       currentPageNumber += 1
     }

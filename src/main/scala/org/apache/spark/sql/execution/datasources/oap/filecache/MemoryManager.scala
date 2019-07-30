@@ -219,6 +219,7 @@ private[filecache] class OffHeapMemoryManager(sparkEnv: SparkEnv)
       s"${size}, used: $memoryUsed")
     // For OFF_HEAP, occupied size also equal to the size.
     MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, size)
+    MemoryBlockHolder(CacheEnum.FAIL, null, 0L, 0L, 0L)
   }
 
   override private[filecache] def free(block: MemoryBlockHolder): Unit = {
@@ -293,12 +294,18 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
   override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
-    val address = PersistentMemoryPlatform.allocateVolatileMemory(size)
-    val occupiedSize = PersistentMemoryPlatform.getOccupiedSize(address)
-    _memoryUsed.getAndAdd(occupiedSize)
-    logDebug(s"request allocate $size memory, actual occupied size: " +
-      s"${occupiedSize}, used: $memoryUsed")
-    MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, occupiedSize)
+    try {
+      val address = PersistentMemoryPlatform.allocateVolatileMemory(size)
+      val occupiedSize = PersistentMemoryPlatform.getOccupiedSize(address)
+      _memoryUsed.getAndAdd(occupiedSize)
+      logDebug(s"request allocate $size memory, actual occupied size: " +
+        s"${occupiedSize}, used: $memoryUsed")
+      MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, occupiedSize)
+    } catch {
+      case e: OutOfMemoryError =>
+        logWarning(e.getMessage)
+        MemoryBlockHolder(CacheEnum.FAIL, null, 0L, 0L, 0L)
+    }
   }
 
   override private[filecache] def free(block: MemoryBlockHolder): Unit = {

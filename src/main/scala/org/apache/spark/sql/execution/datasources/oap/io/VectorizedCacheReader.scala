@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources.oap.io
 
 import java.io.IOException
+import java.util
 
 import scala.collection.JavaConverters._
 
@@ -81,6 +82,11 @@ class VectorizedCacheReader(
   protected var currentRowGroup: BlockMetaData = _
 
   protected var currentRowGroupRowsReturned: Int = 0
+
+  // To record if current row group has failed memory block
+  protected var hasFailedMemoryBlock = false;
+
+  protected var failedMemoryBlockList: util.LinkedList[FiberId] = new util.LinkedList[FiberId]()
 
   override def initialize(): Unit = {
     initializeMetas()
@@ -148,6 +154,13 @@ class VectorizedCacheReader(
 
   protected def readNextRowGroup(): Unit = {
     assert(rowGroupMetaIter.hasNext)
+    hasFailedMemoryBlock = false
+
+    while (!failedMemoryBlockList.isEmpty) {
+      val tempFiberId = failedMemoryBlockList.poll()
+      OapRuntime.getOrCreate.fiberCacheManager.releaseFiber(tempFiberId)
+    }
+
     currentRowGroup = rowGroupMetaIter.next()
     val groupId = currentRowGroup.asInstanceOf[OrderedBlockMetaData].getRowGroupId
 
@@ -161,19 +174,30 @@ class VectorizedCacheReader(
           null
         } else {
           val start = System.nanoTime()
+          val fiberId = DataFiberId(dataFile, id, groupId);
           val fiberCache: FiberCache =
-            OapRuntime.getOrCreate.fiberCacheManager.get(DataFiberId(dataFile, id, groupId))
+            OapRuntime.getOrCreate.fiberCacheManager.get(fiberId)
           val end = System.nanoTime()
           loadFiberTime += (end - start)
           dataFile.update(id, fiberCache)
           val start2 = System.nanoTime()
 
+          if (fiberCache.isFailedMemoryBlock()) {
+            failedMemoryBlockList.add(fiberId)
+            hasFailedMemoryBlock = true
+          }
+
           val reader: ParquetDataFiberReader = if (fiberCache.fiberCompressed) {
             ParquetDataFiberCompressedReader(fiberCache.getBaseOffset,
               columnarBatch.column(order).dataType(), rowCount, fiberCache)
           } else {
-            ParquetDataFiberReader(fiberCache.getBaseOffset,
-              columnarBatch.column(order).dataType(), rowCount)
+            if (!fiberCache.isFailedMemoryBlock()) {
+              ParquetDataFiberReader(fiberCache.getBaseOffset,
+                columnarBatch.column(order).dataType(), rowCount)
+            } else {
+              ParquetDataFaultFiberReader(fiberCache,
+                columnarBatch.column(order).dataType(), rowCount)
+            }
           }
           val end2 = System.nanoTime()
           loadDicTime += (end2 - start2)

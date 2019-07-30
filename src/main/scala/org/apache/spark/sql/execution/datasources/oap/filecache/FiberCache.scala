@@ -21,8 +21,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import com.google.common.primitives.Ints
-
 import scala.collection.mutable
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector
@@ -55,8 +55,12 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
     _refCount.incrementAndGet()
   }
 
+  def isFailedMemoryBlock(): Boolean = {
+    fiberData.cacheType == CacheEnum.FAIL
+  }
+
   def setColumn(column: OnHeapColumnVector): Unit = {
-    if (fiberData.cacheType == CacheEnum.FAIL) {
+    if (isFailedMemoryBlock()) {
       this.column = column;
     } else {
       throw new UnsupportedOperationException(
