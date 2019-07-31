@@ -67,7 +67,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
       this.originByteArray = bytes
     } else {
       throw new UnsupportedOperationException(
-        "fiber cache column can only be set when cache allocation failed")
+        "fiber cache original byte array can only be set when cache allocation failed")
     }
   }
 

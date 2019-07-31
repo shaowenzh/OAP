@@ -27,10 +27,8 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
   extends ParquetDataFiberReader(
     address = fiberCache.getBaseOffset,
     dataType = dataType,
-    total = total
-  ) {
+    total = total) {
   require(fiberCache.getColumn() != null)
-  private val address: Long = fiberCache.getBaseOffset
 
   override def readBatch(
     start: Int, num: Int, column: OnHeapColumnVector): Unit = if (dictionary != null) {
@@ -44,7 +42,7 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
           dictionaryIds.getIntData, Platform.INT_ARRAY_OFFSET, num * 4L)
       case ParquetDataFiberHeader(false, false, _) =>
         Platform.copyMemory(
-          fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getNulls,
+          fiberCache.getColumn().getNulls,
           Platform.BYTE_ARRAY_OFFSET + start, column.getNulls, Platform.BYTE_ARRAY_OFFSET, num)
         Platform.copyMemory(
           fiberCache.getColumn().getDictionaryIds.asInstanceOf[OnHeapColumnVector].getIntData,
@@ -75,7 +73,7 @@ class ParquetDataFaultFiberReader(fiberCache: FiberCache, dataType: DataType, to
   }
 
   private def readBatchFromColumn(
-                                   start: Int, num: Int, column: OnHeapColumnVector): Unit = {
+    start: Int, num: Int, column: OnHeapColumnVector): Unit = {
     val originalColumn = fiberCache.getColumn();
 
     def readBinaryToColumnVector(): Unit = {
