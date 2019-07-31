@@ -44,8 +44,11 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   // record whether the fiber is compressed
   var fiberCompressed: Boolean = false
 
-  // This suppose to be used when cache allocation failed
+  // This suppose to be used when data cache allocation failed
   var column: OnHeapColumnVector = null
+
+  // This suppose to be used when index cache allocation failed
+  var originByteArray: Array[Byte] = null
 
   // We use readLock to lock occupy. _refCount need be atomic to make sure thread-safe
   protected val _refCount = new AtomicLong(0)
@@ -57,6 +60,19 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
 
   def isFailedMemoryBlock(): Boolean = {
     fiberData.cacheType == CacheEnum.FAIL
+  }
+
+  def setOriginByteArray(bytes: Array[Byte]): Unit = {
+    if (isFailedMemoryBlock()) {
+      this.originByteArray = bytes
+    } else {
+      throw new UnsupportedOperationException(
+        "fiber cache column can only be set when cache allocation failed")
+    }
+  }
+
+  def getOriginByteArray(): Array[Byte] = {
+    originByteArray
   }
 
   def setColumn(column: OnHeapColumnVector): Unit = {
@@ -120,7 +136,8 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
       if (!isFailedMemoryBlock()) {
         OapRuntime.get.foreach(_.memoryManager.free(fiberData))
       } else {
-        this.column = null;
+        this.column = null
+        this.originByteArray = null
       }
       OapRuntime.get.foreach(_.fiberLockManager.removeFiberLock(fiberId))
     }
@@ -130,7 +147,11 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
   // For debugging
   def toArray: Array[Byte] = {
     // TODO: Handle overflow
-    val intSize = Ints.checkedCast(size())
+    val intSize = if (originByteArray != null) {
+      originByteArray.length
+    } else {
+      Ints.checkedCast(size())
+    }
     val bytes = new Array[Byte](intSize)
     copyMemoryToBytes(0, bytes)
     bytes
@@ -142,9 +163,20 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
     if (disposed) {
       throw new OapException("Try to access a freed memory")
     }
-    fiberData.baseObject
+
+    if (isFailedMemoryBlock && originByteArray != null) {
+      originByteArray
+    } else {
+      fiberData.baseObject
+    }
   }
-  def getBaseOffset: Long = fiberData.baseOffset
+  def getBaseOffset: Long = {
+    if (isFailedMemoryBlock && originByteArray != null) {
+      Platform.BYTE_ARRAY_OFFSET
+    } else {
+      fiberData.baseOffset
+    }
+  }
 
   def getBoolean(offset: Long): Boolean = Platform.getBoolean(getBaseObj, getBaseOffset + offset)
 

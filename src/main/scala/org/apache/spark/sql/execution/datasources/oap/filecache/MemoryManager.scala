@@ -89,13 +89,19 @@ private[sql] abstract class MemoryManager {
 
   @inline protected def toFiberCache(bytes: Array[Byte]): FiberCache = {
     val block = allocate(bytes.length)
-    Platform.copyMemory(
-      bytes,
-      Platform.BYTE_ARRAY_OFFSET,
-      block.baseObject,
-      block.baseOffset,
-      bytes.length)
-    FiberCache(block)
+    if (block.cacheType != CacheEnum.FAIL) {
+      Platform.copyMemory(
+        bytes,
+        Platform.BYTE_ARRAY_OFFSET,
+        block.baseObject,
+        block.baseOffset,
+        bytes.length)
+      FiberCache(block)
+    } else {
+      val fiberCache = FiberCache(block)
+      fiberCache.setOriginByteArray(bytes)
+      fiberCache
+    }
   }
 
   /**
