@@ -369,19 +369,35 @@ private[filecache] class MixMemoryManager(sparkEnv: SparkEnv)
   }
 
   override def toIndexFiberCache(in: FSDataInputStream, position: Long, length: Int): FiberCache = {
-    indexMemoryManager.toIndexFiberCache(in, position, length).setMemBlockCacheType(CacheEnum.INDEX)
+    val fiberCache = indexMemoryManager.toIndexFiberCache(in, position, length)
+    if (!fiberCache.isFailedMemoryBlock()) {
+      fiberCache.setMemBlockCacheType(CacheEnum.INDEX)
+    }
+    fiberCache
   }
 
   override def toIndexFiberCache(bytes: Array[Byte]): FiberCache = {
-    indexMemoryManager.toIndexFiberCache(bytes).setMemBlockCacheType(CacheEnum.INDEX)
+    val fiberCache = indexMemoryManager.toIndexFiberCache(bytes)
+    if (!fiberCache.isFailedMemoryBlock()) {
+      fiberCache.setMemBlockCacheType(CacheEnum.INDEX)
+    }
+    fiberCache
   }
 
   override def toDataFiberCache(bytes: Array[Byte]): FiberCache = {
-    dataMemoryManager.toDataFiberCache(bytes).setMemBlockCacheType(CacheEnum.DATA)
+    val fiberCache = dataMemoryManager.toDataFiberCache(bytes)
+    if (!fiberCache.isFailedMemoryBlock()) {
+      fiberCache.setMemBlockCacheType(CacheEnum.DATA)
+    }
+    fiberCache
   }
 
   override def getEmptyDataFiberCache(length: Long): FiberCache = {
-    dataMemoryManager.getEmptyDataFiberCache(length).setMemBlockCacheType(CacheEnum.DATA)
+    val fiberCache = dataMemoryManager.getEmptyDataFiberCache(length)
+    if (!fiberCache.isFailedMemoryBlock()) {
+      fiberCache.setMemBlockCacheType(CacheEnum.DATA)
+    }
+    fiberCache
   }
 
   override private[filecache] def free(block: MemoryBlockHolder): Unit = {
