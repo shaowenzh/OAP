@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.oap.filecache
 
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.util.concurrent.locks.{Condition, ReentrantLock, ReentrantReadWriteLock}
 
 import com.google.common.cache._
 import org.apache.hadoop.conf.Configuration
@@ -45,8 +45,21 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   private val removalPendingQueue = new LinkedBlockingQueue[(FiberId, FiberCache)]()
 
+  private val guardianLock = new ReentrantLock()
+  private val guardianLockCond = guardianLock.newCondition()
+
+  private var freeTime: Long = 0L
+
   // Tell if guardian thread is trying to remove one Fiber.
   @volatile private var bRemoving: Boolean = false
+
+  def getGuardianLock(): ReentrantLock = {
+    guardianLock
+  }
+
+  def getGuardianLockCondition(): Condition = {
+    guardianLockCond
+  }
 
   def pendingFiberCount: Int = if (bRemoving) {
     removalPendingQueue.size() + 1
@@ -74,6 +87,10 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
     }
   }
 
+  def printFreeTime(): Unit = {
+    logWarning(s"free time: ${freeTime}")
+  }
+
   private def releaseFiberCache(cache: FiberCache): Unit = {
     bRemoving = true
     val fiberId = cache.fiberId
@@ -87,6 +104,14 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
             s"current: ${_pendingFiberCapacity.get()}, max: $maxMemory")
       }
     } else {
+      freeTime += cache.getFreeTime
+      if (removalPendingQueue.size() == 0) {
+        // logWarning(s"pending size: ${pendingFiberSize}")
+        this.getGuardianLock().lock()
+        // logWarning("cache guardian send signalAll")
+        guardianLockCond.signalAll()
+        this.getGuardianLock().unlock()
+      }
       _pendingFiberSize.addAndGet(-cache.size())
       _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
       // TODO: Make log more readable
@@ -162,6 +187,10 @@ private[sql] class FiberCacheManager(
     logDebug(s"Removed ${fiberToBeRemoved.size} fibers.")
   }
 
+  def getCacheGuardian(): CacheGuardian = {
+    cacheBackend.getCacheGuardian
+  }
+
   // Used by test suite
   private[filecache] def releaseFiber(fiber: FiberId): Unit = {
     if (fiber.isInstanceOf[TestDataFiberId] || fiber.isInstanceOf[TestIndexFiberId]) {
@@ -216,6 +245,8 @@ private[sql] class FiberCacheManager(
 
   // Used by test suite
   private[filecache] def pendingCount: Int = cacheBackend.pendingFiberCount
+
+  def pendingSize: Long = cacheBackend.pendingFiberSize
 
   // A description of this FiberCacheManager for debugging.
   def toDebugString: String = {

@@ -28,6 +28,7 @@ import org.apache.parquet.hadoop.metadata._
 import org.apache.parquet.hadoop.utils.Collections3
 import org.apache.parquet.schema.{MessageType, Type}
 
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.memory.MemoryMode
 import org.apache.spark.sql.catalyst.InternalRow
@@ -81,6 +82,10 @@ class VectorizedCacheReader(
   protected var currentRowGroup: BlockMetaData = _
 
   protected var currentRowGroupRowsReturned: Int = 0
+
+  private val testTask = TaskContext.get()
+
+  private val waitingEvictionThreshold: Long = 1024 * 1024 * 1024
 
   override def initialize(): Unit = {
     initializeMetas()
@@ -160,9 +165,11 @@ class VectorizedCacheReader(
         if (missingColumns(order)) {
           null
         } else {
+          val fiberId = DataFiberId(dataFile, id, groupId)
+          // logWarning(s"task id: ${testTask.taskAttemptId()} start to read data: $fiberId")
           val start = System.nanoTime()
           val fiberCache: FiberCache =
-            OapRuntime.getOrCreate.fiberCacheManager.get(DataFiberId(dataFile, id, groupId))
+            OapRuntime.getOrCreate.fiberCacheManager.get(fiberId)
           val end = System.nanoTime()
           loadFiberTime += (end - start)
           dataFile.update(id, fiberCache)
@@ -284,5 +291,19 @@ class VectorizedCacheReader(
     numBatched = num
     batchIdx = 0
     currentRowGroupRowsReturned += num
+
+    if (rowsReturned == totalCountLoadedSoFar) {
+      // logWarning(s"task id: ${testTask.taskAttemptId()} to release inUseFiberCache")
+      dataFile.releaseAll()
+      OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().lock()
+        while (OapRuntime.getOrCreate.fiberCacheManager.pendingSize > waitingEvictionThreshold) {
+          OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().printFreeTime()
+          logWarning(s"${TaskContext.get().taskAttemptId()} get into condition wait")
+          OapRuntime.getOrCreate.fiberCacheManager
+            .getCacheGuardian().getGuardianLockCondition().await()
+          logWarning(s"${TaskContext.get().taskAttemptId()} leave condition wait")
+        }
+      OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().unlock()
+    }
   }
 }

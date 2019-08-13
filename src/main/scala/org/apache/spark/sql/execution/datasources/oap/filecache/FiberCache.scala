@@ -31,6 +31,8 @@ import org.apache.spark.unsafe.types.UTF8String
 
 case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
 
+  var freeTime: Long = 0L
+
   // This is and only is set in `cache() of OapCache`
   // TODO: make it immutable
   var fiberId: FiberId = _
@@ -74,6 +76,7 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
             // Otherwise, it becomes a polling loop.
             // TODO: use lock/sync-obj to leverage the concurrency APIs instead of explicit sleep.
             Thread.sleep(100)
+            freeTime += 100
           } else {
             if (writeLock.tryLock(200, TimeUnit.MILLISECONDS)) {
               try {
@@ -90,6 +93,10 @@ case class FiberCache(fiberData: MemoryBlockHolder) extends Logging {
     }
     logWarning(s"Fiber Cache Dispose waiting detected for $fiberId")
     false
+  }
+
+  def getFreeTime: Long = {
+    freeTime
   }
 
   protected var disposed = false

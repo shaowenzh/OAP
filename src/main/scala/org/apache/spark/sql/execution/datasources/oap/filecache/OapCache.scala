@@ -23,6 +23,7 @@ import scala.collection.JavaConverters._
 
 import com.google.common.cache._
 
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.oap.OapRuntime
@@ -43,6 +44,8 @@ trait OapCache {
   def cacheCount: Long
   def cacheStats: CacheStats
   def pendingFiberCount: Int
+  def pendingFiberSize: Long
+  def getCacheGuardian: CacheGuardian
   def cleanUp(): Unit = {
     invalidateAll(getFibers)
     dataFiberSize.set(0L)
@@ -115,6 +118,10 @@ class SimpleOapCache extends OapCache with Logging {
   override def cacheCount: Long = 0
 
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
+
+  override def pendingFiberSize: Long = cacheGuardian.pendingFiberSize
+
+  override def getCacheGuardian: CacheGuardian = cacheGuardian
 }
 
 class GuavaOapCache(
@@ -140,7 +147,15 @@ class GuavaOapCache(
   private val removalListener = new RemovalListener[FiberId, FiberCache] {
     override def onRemoval(notification: RemovalNotification[FiberId, FiberCache]): Unit = {
       logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
-      cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
+       cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
+      /*
+      val fiberCache: FiberCache = notification.getValue
+      while(!fiberCache.tryDispose()) {
+        logWarning(
+          s"task id: ${TaskContext.get().taskAttemptId()} " +
+            s"failed to dispose fibercache, will try again")
+      }
+      */
       _cacheSize.addAndGet(-notification.getValue.size())
       decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }
@@ -330,6 +345,10 @@ class GuavaOapCache(
     }
 
   override def pendingFiberCount: Int = cacheGuardian.pendingFiberCount
+
+  override def pendingFiberSize: Long = cacheGuardian.pendingFiberSize
+
+  override def getCacheGuardian: CacheGuardian = cacheGuardian
 
   override def cleanUp(): Unit = {
     super.cleanUp()
