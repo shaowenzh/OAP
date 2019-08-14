@@ -83,10 +83,6 @@ class VectorizedCacheReader(
 
   protected var currentRowGroupRowsReturned: Int = 0
 
-  private val testTask = TaskContext.get()
-
-  private val waitingEvictionThreshold: Long = 1024 * 1024 * 1024
-
   override def initialize(): Unit = {
     initializeMetas()
     initializeInternal()
@@ -160,16 +156,23 @@ class VectorizedCacheReader(
     var loadDicTime = 0L
     val rowCount = currentRowGroup.getRowCount.toInt
 
+    OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().lock()
+    while (OapRuntime.getOrCreate.fiberCacheManager.isNeedWaitForFree) {
+      logWarning(s"${TaskContext.get().taskAttemptId()} get into condition wait")
+      OapRuntime.getOrCreate.fiberCacheManager
+        .getCacheGuardian().getGuardianLockCondition().await()
+      logWarning(s"${TaskContext.get().taskAttemptId()} leave condition wait")
+    }
+    OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().unlock()
+
     fiberReaders = requiredColumnIds.zipWithIndex.map {
       case (id, order) =>
         if (missingColumns(order)) {
           null
         } else {
-          val fiberId = DataFiberId(dataFile, id, groupId)
-          // logWarning(s"task id: ${testTask.taskAttemptId()} start to read data: $fiberId")
           val start = System.nanoTime()
           val fiberCache: FiberCache =
-            OapRuntime.getOrCreate.fiberCacheManager.get(fiberId)
+            OapRuntime.getOrCreate.fiberCacheManager.get(DataFiberId(dataFile, id, groupId))
           val end = System.nanoTime()
           loadFiberTime += (end - start)
           dataFile.update(id, fiberCache)
@@ -295,15 +298,6 @@ class VectorizedCacheReader(
     if (rowsReturned == totalCountLoadedSoFar) {
       // logWarning(s"task id: ${testTask.taskAttemptId()} to release inUseFiberCache")
       dataFile.releaseAll()
-      OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().lock()
-        while (OapRuntime.getOrCreate.fiberCacheManager.pendingSize > waitingEvictionThreshold) {
-          OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().printFreeTime()
-          logWarning(s"${TaskContext.get().taskAttemptId()} get into condition wait")
-          OapRuntime.getOrCreate.fiberCacheManager
-            .getCacheGuardian().getGuardianLockCondition().await()
-          logWarning(s"${TaskContext.get().taskAttemptId()} leave condition wait")
-        }
-      OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().unlock()
     }
   }
 }

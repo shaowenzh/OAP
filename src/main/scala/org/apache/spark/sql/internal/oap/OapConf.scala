@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.internal.oap
 
+import org.apache.spark.network.util.ByteUnit
 import org.apache.spark.sql.oap.adapter.SqlConfAdapter
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,4 +401,11 @@ object OapConf {
       .doc("The oap data fiber compression unit length")
       .intConf
       .createWithDefault(4096)
+
+  val DCPMM_FREE_WAIT_THRESHOLD =
+    SqlConfAdapter.buildConf("spark.sql.oap.dcpmm.free.wait.threshold")
+      .doc("The size used to determine when dcpmm is going to wait")
+      .bytesConf(ByteUnit.BYTE)
+      .checkValue(_ >= 0, "The cache size must not be negative")
+      .createWithDefault(1073741824L)
 }

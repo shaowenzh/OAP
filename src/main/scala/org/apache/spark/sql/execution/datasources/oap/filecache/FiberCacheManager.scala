@@ -50,8 +50,14 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   private var freeTime: Long = 0L
 
+  private var waitNotifyActive: Boolean = false
+
   // Tell if guardian thread is trying to remove one Fiber.
   @volatile private var bRemoving: Boolean = false
+
+  def enableWaitNotifyActive(): Unit = {
+    waitNotifyActive = true
+  }
 
   def getGuardianLock(): ReentrantLock = {
     guardianLock
@@ -87,10 +93,6 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
     }
   }
 
-  def printFreeTime(): Unit = {
-    logWarning(s"free time: ${freeTime}")
-  }
-
   private def releaseFiberCache(cache: FiberCache): Unit = {
     bRemoving = true
     val fiberId = cache.fiberId
@@ -104,18 +106,17 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
             s"current: ${_pendingFiberCapacity.get()}, max: $maxMemory")
       }
     } else {
-      freeTime += cache.getFreeTime
-      if (removalPendingQueue.size() == 0) {
+      _pendingFiberSize.addAndGet(-cache.size())
+      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+      // TODO: Make log more readable
+      logDebug(s"Fiber removed successfully. Fiber: $fiberId")
+      if (waitNotifyActive && removalPendingQueue.size() == 0) {
         // logWarning(s"pending size: ${pendingFiberSize}")
         this.getGuardianLock().lock()
         // logWarning("cache guardian send signalAll")
         guardianLockCond.signalAll()
         this.getGuardianLock().unlock()
       }
-      _pendingFiberSize.addAndGet(-cache.size())
-      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
-      // TODO: Make log more readable
-      logDebug(s"Fiber removed successfully. Fiber: $fiberId")
     }
     bRemoving = false
   }
@@ -135,9 +136,13 @@ private[sql] class FiberCacheManager(
   private val _dataCacheCompressionSize = sparkEnv.conf.get(
     OapConf.OAP_DATA_FIBER_CACHE_COMPRESSION_SIZE)
 
+  private val _dcpmmWaitingThreshold = sparkEnv.conf.get(OapConf.DCPMM_FREE_WAIT_THRESHOLD)
+
   def dataCacheCompressEnable: Boolean = _dataCacheCompressEnable
   def dataCacheCompressionCodec: String = _dataCacheCompressionCodec
   def dataCacheCompressionSize: Int = _dataCacheCompressionSize
+
+  def dcpmmWaitingThreshold: Long = _dcpmmWaitingThreshold
 
   private val cacheBackend: OapCache = {
     val cacheName = sparkEnv.conf.get("spark.oap.cache.strategy", DEFAULT_CACHE_STRATEGY)
@@ -162,6 +167,9 @@ private[sql] class FiberCacheManager(
     cacheBackend.cleanUp()
   }
 
+  if (memoryManager.isDcpmmUsed()) {
+    cacheBackend.getCacheGuardian.enableWaitNotifyActive()
+  }
   // NOTE: all members' init should be placed before this line.
   logDebug(s"Initialized FiberCacheManager")
 
@@ -189,6 +197,18 @@ private[sql] class FiberCacheManager(
 
   def getCacheGuardian(): CacheGuardian = {
     cacheBackend.getCacheGuardian
+  }
+
+  def isDcpmmUsed(): Boolean = {
+    memoryManager.isDcpmmUsed()
+  }
+
+  def isNeedWaitForFree(): Boolean = {
+    logWarning(
+      s"dcpmm wait threshold: ${OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold}")
+    memoryManager.isDcpmmUsed() &&
+      (OapRuntime.getOrCreate.fiberCacheManager.pendingSize >
+      OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold)
   }
 
   // Used by test suite

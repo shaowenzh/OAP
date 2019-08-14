@@ -23,7 +23,6 @@ import scala.collection.JavaConverters._
 
 import com.google.common.cache._
 
-import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.oap.OapRuntime
@@ -147,15 +146,7 @@ class GuavaOapCache(
   private val removalListener = new RemovalListener[FiberId, FiberCache] {
     override def onRemoval(notification: RemovalNotification[FiberId, FiberCache]): Unit = {
       logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
-       cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
-      /*
-      val fiberCache: FiberCache = notification.getValue
-      while(!fiberCache.tryDispose()) {
-        logWarning(
-          s"task id: ${TaskContext.get().taskAttemptId()} " +
-            s"failed to dispose fibercache, will try again")
-      }
-      */
+      cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
       decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }

@@ -126,6 +126,8 @@ private[sql] abstract class MemoryManager {
     FiberCache(allocate(length))
   }
   def stop(): Unit = {}
+
+  def isDcpmmUsed(): Boolean = {false}
 }
 
 private[sql] object MemoryManager {
@@ -307,6 +309,8 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     _memoryUsed.getAndAdd(-block.occupiedSize)
     logDebug(s"freed ${block.occupiedSize} memory, used: $memoryUsed")
   }
+
+  override def isDcpmmUsed(): Boolean = {true}
 }
 
 /**
@@ -391,4 +395,6 @@ private[filecache] class MixMemoryManager(sparkEnv: SparkEnv)
 
   override def cacheGuardianMemory: Long =
     indexMemoryManager.cacheGuardianMemory + dataMemoryManager.cacheGuardianMemory
+
+  override def isDcpmmUsed(): Boolean = {true}
 }
