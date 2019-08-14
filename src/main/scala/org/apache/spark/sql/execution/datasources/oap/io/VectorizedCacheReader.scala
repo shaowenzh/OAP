@@ -298,7 +298,6 @@ class VectorizedCacheReader(
     currentRowGroupRowsReturned += num
 
     if (rowsReturned == totalCountLoadedSoFar) {
-      // logWarning(s"task id: ${testTask.taskAttemptId()} to release inUseFiberCache")
       dataFile.releaseAll()
     }
   }
