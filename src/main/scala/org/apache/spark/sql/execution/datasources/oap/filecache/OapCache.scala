@@ -146,11 +146,14 @@ class GuavaOapCache(
   // Total cached size for debug purpose, not include pending fiber
   private val _cacheSize: AtomicLong = new AtomicLong(0)
 
+  private val _cacheOccupiedSize: AtomicLong = new AtomicLong(0)
+
   private val removalListener = new RemovalListener[FiberId, FiberCache] {
     override def onRemoval(notification: RemovalNotification[FiberId, FiberCache]): Unit = {
       logDebug(s"Put fiber into removal list. Fiber: ${notification.getKey}")
       cacheGuardian.addRemovalFiber(notification.getKey, notification.getValue)
       _cacheSize.addAndGet(-notification.getValue.size())
+      _cacheOccupiedSize.addAndGet(-notification.getValue.getOccupiedSize())
       decFiberCountAndSize(notification.getKey, 1, notification.getValue.size())
     }
   }
@@ -192,14 +195,23 @@ class GuavaOapCache(
       .concurrencyLevel(CONCURRENCY_LEVEL)
       .build[FiberId, FiberCache](new CacheLoader[FiberId, FiberCache] {
       override def load(key: FiberId): FiberCache = {
-        val startLoadingTime = System.currentTimeMillis()
-        val fiberCache = cache(key)
-        incFiberCountAndSize(key, 1, fiberCache.size())
-        logDebug(
-          "Load missed index fiber took %s. Fiber: %s. length: %s".format(
-            Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
-        _cacheSize.addAndGet(fiberCache.size())
-        fiberCache
+        try {
+          val startLoadingTime = System.currentTimeMillis()
+          val fiberCache = cache(key)
+          incFiberCountAndSize(key, 1, fiberCache.size())
+          logDebug(
+            "Load missed index fiber took %s. Fiber: %s. length: %s".format(
+              Utils.getUsedTimeMs(startLoadingTime), key, fiberCache.size()))
+          _cacheSize.addAndGet(fiberCache.size())
+          _cacheOccupiedSize.addAndGet(fiberCache.getOccupiedSize())
+          fiberCache
+        } catch {
+          case e: OutOfMemoryError =>
+            logWarning(s"Current guava occupied size: ${_cacheOccupiedSize}, " +
+              s"current cache guardian pending occupied size: " +
+              s"${getCacheGuardian.pendingFiberOccupiedSize}")
+            throw new OutOfMemoryError("Woops! got allocation error")
+        }
       }
     })
   }

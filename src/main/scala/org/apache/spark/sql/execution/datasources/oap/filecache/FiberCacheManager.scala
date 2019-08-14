@@ -48,8 +48,6 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
   private val guardianLock = new ReentrantLock()
   private val guardianLockCond = guardianLock.newCondition()
 
-  private var freeTime: Long = 0L
-
   private var waitNotifyActive: Boolean = false
 
   // Tell if guardian thread is trying to remove one Fiber.
@@ -109,15 +107,18 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
       }
     } else {
       _pendingFiberSize.addAndGet(-cache.size())
-      _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+
       // TODO: Make log more readable
       logDebug(s"Fiber removed successfully. Fiber: $fiberId")
-      if (waitNotifyActive && removalPendingQueue.size() == 0) {
-        // logWarning(s"pending size: ${pendingFiberSize}")
+      if (waitNotifyActive) {
         this.getGuardianLock().lock()
-        // logWarning("cache guardian send signalAll")
-        guardianLockCond.signalAll()
+        _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
+        if (_pendingFiberCapacity.get() == 0) {
+          guardianLockCond.signalAll()
+        }
         this.getGuardianLock().unlock()
+      } else {
+        _pendingFiberCapacity.addAndGet(-cache.getOccupiedSize())
       }
     }
     bRemoving = false

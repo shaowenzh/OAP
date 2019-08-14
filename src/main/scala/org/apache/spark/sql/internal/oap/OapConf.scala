@@ -407,5 +407,12 @@ object OapConf {
       .doc("The size used to determine when dcpmm is going to wait")
       .bytesConf(ByteUnit.BYTE)
       .checkValue(_ >= 0, "The cache size must not be negative")
-      .createWithDefault(1073741824L)
+      .createWithDefault(524288000L)
+
+  val OAP_ENABLE_MEMKIND_CONSERVATIVE =
+    SqlConfAdapter.buildConf("spark.sql.oap.memkind.conservative.enable")
+      .internal()
+      .doc("To enable memkind conservative pattern")
+      .booleanConf
+      .createWithDefault(false)
 }

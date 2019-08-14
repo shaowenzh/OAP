@@ -266,8 +266,15 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
     val initialSize = Utils.byteStringAsBytes(initialSizeStr)
     val reservedSizeStr = conf.get(OapConf.OAP_FIBERCACHE_PERSISTENT_MEMORY_RESERVED_SIZE).trim
     val reservedSize = Utils.byteStringAsBytes(reservedSizeStr)
+
+    val enableConservative = conf.getBoolean(OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.key,
+      OapConf.OAP_ENABLE_MEMKIND_CONSERVATIVE.defaultValue.get)
+    val memkindPattern = if (enableConservative) 1 else 0
+
+    logInfo(s"Current Memkind pattern: ${memkindPattern}")
+
     val fullPath = Utils.createTempDir(initialPath + File.separator + executorId)
-    PersistentMemoryPlatform.initialize(fullPath.getCanonicalPath, initialSize)
+    PersistentMemoryPlatform.initialize(fullPath.getCanonicalPath, initialSize, memkindPattern)
     logInfo(s"Initialize Intel Optane DC persistent memory successfully, numaId: ${numaId}, " +
       s"initial path: ${fullPath.getCanonicalPath}, initial size: ${initialSize}, reserved size: " +
       s"${reservedSize}")
