@@ -158,10 +158,12 @@ class VectorizedCacheReader(
 
     OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().lock()
     while (OapRuntime.getOrCreate.fiberCacheManager.isNeedWaitForFree) {
-      logWarning(s"${TaskContext.get().taskAttemptId()} get into condition wait")
+      logWarning(s"${TaskContext.get().taskAttemptId()} start to wait for cache free, " +
+        s"current pending occupied size: " +
+        s"${OapRuntime.getOrCreate.fiberCacheManager.pendingOccupiedSize}")
       OapRuntime.getOrCreate.fiberCacheManager
         .getCacheGuardian().getGuardianLockCondition().await()
-      logWarning(s"${TaskContext.get().taskAttemptId()} leave condition wait")
+      logWarning(s"${TaskContext.get().taskAttemptId()} leave wait")
     }
     OapRuntime.getOrCreate.fiberCacheManager.getCacheGuardian().getGuardianLock().unlock()
 

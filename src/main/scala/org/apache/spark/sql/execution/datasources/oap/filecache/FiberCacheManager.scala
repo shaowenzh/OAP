@@ -75,6 +75,8 @@ private[filecache] class CacheGuardian(maxMemory: Long) extends Thread with Logg
 
   def pendingFiberSize: Long = _pendingFiberSize.get()
 
+  def pendingFiberOccupiedSize: Long = _pendingFiberCapacity.get()
+
   def addRemovalFiber(fiber: FiberId, fiberCache: FiberCache): Unit = {
     _pendingFiberSize.addAndGet(fiberCache.size())
     // Record the occupied size
@@ -204,10 +206,13 @@ private[sql] class FiberCacheManager(
   }
 
   def isNeedWaitForFree(): Boolean = {
-    logWarning(
-      s"dcpmm wait threshold: ${OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold}")
+    logDebug(
+      s"dcpmm wait threshold: " +
+        s"${OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold}, " +
+        s"cache guardian pending size: " +
+        s"${OapRuntime.getOrCreate.fiberCacheManager.pendingOccupiedSize}")
     memoryManager.isDcpmmUsed() &&
-      (OapRuntime.getOrCreate.fiberCacheManager.pendingSize >
+      (OapRuntime.getOrCreate.fiberCacheManager.pendingOccupiedSize >
       OapRuntime.getOrCreate.fiberCacheManager.dcpmmWaitingThreshold)
   }
 
@@ -267,6 +272,8 @@ private[sql] class FiberCacheManager(
   private[filecache] def pendingCount: Int = cacheBackend.pendingFiberCount
 
   def pendingSize: Long = cacheBackend.pendingFiberSize
+
+  def pendingOccupiedSize: Long = cacheBackend.pendingFiberOccupiedSize
 
   // A description of this FiberCacheManager for debugging.
   def toDebugString: String = {
