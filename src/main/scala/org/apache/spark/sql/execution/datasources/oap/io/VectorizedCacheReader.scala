@@ -147,7 +147,6 @@ class VectorizedCacheReader(
     if (rowsReturned != totalCountLoadedSoFar) {
       return
     }
-    clearFailedCache()
     readNextRowGroup()
   }
 
@@ -316,6 +315,7 @@ class VectorizedCacheReader(
 
     if (rowsReturned == totalCountLoadedSoFar) {
       dataFile.releaseAll()
+      clearFailedCache()
     }
   }
 
