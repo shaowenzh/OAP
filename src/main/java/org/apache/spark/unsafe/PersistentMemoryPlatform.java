@@ -69,7 +69,7 @@ public class PersistentMemoryPlatform {
    * @return the address which same as Platform.allocateMemory, it can be operated by
    * Platform which same as OFF_HEAP memory.
    */
-  public static native long allocateVolatileMemory(long size);
+  public static native AddressObj allocateVolatileMemory(long size);
 
   /**
    * Get the actual occupied size of the given address. The occupied size should be different

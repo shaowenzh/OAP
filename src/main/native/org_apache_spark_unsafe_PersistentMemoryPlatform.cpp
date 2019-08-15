@@ -78,22 +78,30 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_ini
   env->ReleaseStringUTFChars(path, str);
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
+JNIEXPORT jobject JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
   (JNIEnv *env, jclass clazz, jlong size) {
   check(env);
+
+  jclass cls = env->FindClass("org/apache/spark/unsafe/AddressObj");
+  if (NULL == cls) {
+    jclass exceptionCls = env->FindClass("java/lang/Exception");
+        env->ThrowNew(exceptionCls,
+          "Can't find AddressObj class.");
+  }
+  jmethodID constructor = env->GetMethodID(cls, "<init>", "(JI)V");
+  if (NULL == constructor) {
+    jclass exceptionCls = env->FindClass("java/lang/Exception");
+      env->ThrowNew(exceptionCls,
+        "Can't find constructor.");
+  }
 
   size_t sz = (size_t)size;
   void *p = memkind_malloc(pmemkind, sz);
   if (p == NULL) {
-    jclass errorCls = env->FindClass("java/lang/OutOfMemoryError");
-    std::string errorMsg;
-    errorMsg.append("Don't have enough memory, please consider decrease the persistent ");
-    errorMsg.append("memory usable ratio. The requested size: ");
-    errorMsg.append(std::to_string(sz));
-    env->ThrowNew(errorCls, errorMsg.c_str());
+    return env->NewObject(cls, constructor, (jlong)0, 0);
   }
 
-  return addr_to_java(p);
+  return env->NewObject(cls, constructor, addr_to_java(p), 1);
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_getOccupiedSize

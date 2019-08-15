@@ -37,7 +37,7 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_ini
  * Method:    allocateMemory
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
+JNIEXPORT jobject JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
   (JNIEnv *, jclass, jlong);
 
 /*
