@@ -19,11 +19,11 @@ package org.apache.spark.unsafe;
 
 public class AddressObj {
   private long address;
-  private int isFailed;
+  private int isSuccess;
 
-  public AddressObj(long address, int isFailed) {
+  public AddressObj(long address, int isSuccess) {
     this.address = address;
-    this.isFailed = isFailed;
+    this.isSuccess = isSuccess;
   }
 
   public long getAddress() {
@@ -34,11 +34,11 @@ public class AddressObj {
     this.address = address;
   }
 
-  public int getIsFailed() {
-    return isFailed;
+  public int getIsSuccess() {
+    return isSuccess;
   }
 
-  public void setIsFailed(int isFailed) {
-    this.isFailed = isFailed;
+  public void setIsSuccess(int isSuccess) {
+    this.isSuccess = isSuccess;
   }
 }

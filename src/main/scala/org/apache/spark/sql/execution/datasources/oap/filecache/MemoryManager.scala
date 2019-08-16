@@ -309,7 +309,7 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
 
   override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
     val addressObj: AddressObj = PersistentMemoryPlatform.allocateVolatileMemory(size)
-    if (addressObj.getIsFailed == 0) {
+    if (addressObj.getIsSuccess == 0) {
       logWarning(
         s"DCPMM cache allocation failed (address: ${addressObj.getAddress}), revert read from file")
       MemoryBlockHolder(CacheEnum.FAIL, null, 0L, 0L, 0L)
