@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.datasources.OapException
 import org.apache.spark.sql.execution.datasources.oap.utils.PersistentMemoryConfigUtils
 import org.apache.spark.sql.internal.oap.OapConf
 import org.apache.spark.storage.{BlockManager, TestBlockId}
-import org.apache.spark.unsafe.{AddressObj, PersistentMemoryPlatform, Platform}
+import org.apache.spark.unsafe.{PersistentMemoryPlatform, Platform}
 import org.apache.spark.util.Utils
 
 object CacheEnum extends Enumeration {
@@ -308,17 +308,17 @@ private[filecache] class PersistentMemoryManager(sparkEnv: SparkEnv)
   override def cacheGuardianMemory: Long = _cacheGuardianMemory
 
   override private[filecache] def allocate(size: Long): MemoryBlockHolder = {
-    val addressObj: AddressObj = PersistentMemoryPlatform.allocateVolatileMemory(size)
-    if (addressObj.getIsSuccess == 0) {
+    val address = PersistentMemoryPlatform.allocateVolatileMemory(size)
+    if (address == 0) {
       logWarning(
-        s"DCPMM cache allocation failed (address: ${addressObj.getAddress}), revert read from file")
+        s"DCPMM cache allocation failed (address: ${address}), revert read from file")
       MemoryBlockHolder(CacheEnum.FAIL, null, 0L, 0L, 0L)
     } else {
-      val occupiedSize = PersistentMemoryPlatform.getOccupiedSize(addressObj.getAddress)
+      val occupiedSize = PersistentMemoryPlatform.getOccupiedSize(address)
       _memoryUsed.getAndAdd(occupiedSize)
       logDebug(s"request allocate $size memory, actual occupied size: " +
         s"${occupiedSize}, used: $memoryUsed")
-      MemoryBlockHolder(CacheEnum.GENERAL, null, addressObj.getAddress, size, occupiedSize)
+      MemoryBlockHolder(CacheEnum.GENERAL, null, address, size, occupiedSize)
     }
   }
 

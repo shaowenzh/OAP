@@ -78,30 +78,17 @@ JNIEXPORT void JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_ini
   env->ReleaseStringUTFChars(path, str);
 }
 
-JNIEXPORT jobject JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
+JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_allocateVolatileMemory
   (JNIEnv *env, jclass clazz, jlong size) {
   check(env);
-
-  jclass cls = env->FindClass("org/apache/spark/unsafe/AddressObj");
-  if (NULL == cls) {
-    jclass exceptionCls = env->FindClass("java/lang/Exception");
-        env->ThrowNew(exceptionCls,
-          "Can't find AddressObj class.");
-  }
-  jmethodID constructor = env->GetMethodID(cls, "<init>", "(JI)V");
-  if (NULL == constructor) {
-    jclass exceptionCls = env->FindClass("java/lang/Exception");
-      env->ThrowNew(exceptionCls,
-        "Can't find constructor.");
-  }
 
   size_t sz = (size_t)size;
   void *p = memkind_malloc(pmemkind, sz);
   if (p == NULL) {
-    return env->NewObject(cls, constructor, (jlong)0, 0);
+    return (jlong)0;
   }
 
-  return env->NewObject(cls, constructor, addr_to_java(p), 1);
+  return addr_to_java(p);
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_unsafe_PersistentMemoryPlatform_getOccupiedSize
